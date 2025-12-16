@@ -52,16 +52,17 @@ GITHUB_OWNER = os.getenv("GITHUB_OWNER", "")
 GITHUB_REPO = os.getenv("GITHUB_REPO", "")
 
 # Vercel URL (public repository URL)
-VERCEL_URL = os.getenv("VERCEL_URL", "https://esign-olive.vercel.app")
+VERCEL_URL = os.getenv("VERCEL_URL", "https://esign-repo.vercel.app")
 
-# ESign paths (configurable via ESIGN_PATH env var)
-DEFAULT_ESIGN_PATH = r"C:\inetpub\wwwroot\esign"
-ESIGN_BASE_PATH = Path(os.getenv("ESIGN_PATH", DEFAULT_ESIGN_PATH))
-VERSIONS_PATH = ESIGN_BASE_PATH / "versions"
-MAIN_IPA_PATH = ESIGN_BASE_PATH / "soundcloud.ipa"
-SOURCE_JSON_PATH = ESIGN_BASE_PATH / "source.json"
-VERSION_HISTORY_PATH = ESIGN_BASE_PATH / "version_history.json"
-CHANGELOG_PATH = ESIGN_BASE_PATH / "changelog.txt"
+# Project paths
+PROJECT_PATH = Path(__file__).parent
+IPA_PATH = PROJECT_PATH / "IPA"
+ESIGN_PATH = PROJECT_PATH / "esign"
+VERSIONS_PATH = IPA_PATH / "versions"
+MAIN_IPA_PATH = IPA_PATH / "soundcloud.ipa"
+SOURCE_JSON_PATH = ESIGN_PATH / "source.json"
+VERSION_HISTORY_PATH = ESIGN_PATH / "version_history.json"
+CHANGELOG_PATH = ESIGN_PATH / "changelog.txt"
 
 # Session file for Telethon
 SESSION_NAME = "esignbot_session"
@@ -71,6 +72,9 @@ MAX_VERSIONS = 20
 
 # Executor for non-blocking file operations
 executor = ThreadPoolExecutor(max_workers=2)
+
+# Global Telethon client (initialized in main)
+telethon_client: TelegramClient = None
 
 # =============================================================================
 # LOGGING SETUP
@@ -97,8 +101,17 @@ logger = logging.getLogger("ESignBot")
 # =============================================================================
 
 
+class UploadStates(StatesGroup):
+    waiting_for_ipa = State()
+    waiting_for_confirmation = State()
+
+
 class ChangelogStates(StatesGroup):
     waiting_for_changelog = State()
+
+
+class DeleteVersionStates(StatesGroup):
+    waiting_for_confirmation = State()
 
 
 # =============================================================================
@@ -233,8 +246,14 @@ async def save_source_json(source: dict) -> bool:
 
 async def upload_to_github_release(file_path: Path, version: str, changelog: str) -> Optional[str]:
     """Upload IPA to GitHub Releases and return the download URL."""
+    # #region agent log
+    log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:247", "message": "upload_to_github_release entry", "data": {"version": version, "file_path": str(file_path), "file_exists": file_path.exists(), "has_token": bool(GITHUB_TOKEN), "has_owner": bool(GITHUB_OWNER), "has_repo": bool(GITHUB_REPO)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+    # #endregion
     if not GITHUB_TOKEN or not GITHUB_OWNER or not GITHUB_REPO:
         logger.error("GitHub configuration missing")
+        # #region agent log
+        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:252", "message": "GitHub config missing", "data": {"has_token": bool(GITHUB_TOKEN), "has_owner": bool(GITHUB_OWNER), "has_repo": bool(GITHUB_REPO)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+        # #endregion
         return None
     
     headers = {
@@ -293,19 +312,72 @@ async def upload_to_github_release(file_path: Path, version: str, changelog: str
                 file_data = await f.read()
             
             async with session.post(upload_url, headers=upload_headers, data=file_data) as upload_resp:
+                # #region agent log
+                log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:308", "message": "GitHub asset upload response", "data": {"status": upload_resp.status, "file_size": len(file_data)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+                # #endregion
                 if upload_resp.status == 201:
                     asset_data = await upload_resp.json()
                     download_url = asset_data["browser_download_url"]
                     logger.info(f"Uploaded IPA to GitHub: {download_url}")
+                    # #region agent log
+                    log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:312", "message": "GitHub upload success", "data": {"download_url": download_url}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+                    # #endregion
                     return download_url
                 else:
                     error = await upload_resp.text()
                     logger.error(f"Failed to upload asset: {error}")
+                    # #region agent log
+                    log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:316", "message": "GitHub upload failed", "data": {"status": upload_resp.status, "error": error[:200]}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+                    # #endregion
                     return None
                     
     except Exception as e:
         logger.error(f"GitHub upload error: {e}")
+        # #region agent log
+        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:320", "message": "GitHub upload exception", "data": {"error": str(e)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+        # #endregion
         return None
+
+
+async def delete_github_release(version: str) -> bool:
+    """Delete a GitHub release by version tag."""
+    if not GITHUB_TOKEN or not GITHUB_OWNER or not GITHUB_REPO:
+        logger.error("GitHub configuration missing")
+        return False
+    
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            tag_name = f"v{version}"
+            release_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tags/{tag_name}"
+            
+            # Get release info
+            async with session.get(release_url, headers=headers) as resp:
+                if resp.status == 200:
+                    release_data = await resp.json()
+                    release_id = release_data["id"]
+                    
+                    # Delete the release
+                    delete_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/{release_id}"
+                    async with session.delete(delete_url, headers=headers) as del_resp:
+                        if del_resp.status == 204:
+                            logger.info(f"Deleted GitHub release: {tag_name}")
+                            return True
+                        else:
+                            error = await del_resp.text()
+                            logger.error(f"Failed to delete release: {error}")
+                            return False
+                else:
+                    logger.warning(f"Release {tag_name} not found on GitHub")
+                    return False
+                    
+    except Exception as e:
+        logger.error(f"GitHub release deletion error: {e}")
+        return False
 
 
 async def push_file_to_github(file_path: Path, repo_path: str, commit_message: str) -> bool:
@@ -334,6 +406,10 @@ async def push_file_to_github(file_path: Path, repo_path: str, commit_message: s
             async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
                 content = await f.read()
             
+            # #region agent log
+            log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D", "location": "bot.py:407", "message": "Content being pushed to GitHub", "data": {"content_preview": content[:300], "content_length": len(content), "sha_found": sha is not None, "repo_path": repo_path}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+            # #endregion
+            
             import base64
             encoded_content = base64.b64encode(content.encode()).decode()
             
@@ -346,16 +422,26 @@ async def push_file_to_github(file_path: Path, repo_path: str, commit_message: s
                 payload["sha"] = sha
             
             async with session.put(file_url, headers=headers, json=payload) as resp:
+                resp_body = await resp.text()
+                # #region agent log
+                log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D", "location": "bot.py:420", "message": "GitHub file push response", "data": {"status": resp.status, "repo_path": repo_path, "response_preview": resp_body[:300] if resp_body else "empty"}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+                # #endregion
                 if resp.status in [200, 201]:
                     logger.info(f"Pushed {repo_path} to GitHub")
                     return True
                 else:
                     error = await resp.text()
                     logger.error(f"Failed to push file: {error}")
+                    # #region agent log
+                    log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "bot.py:367", "message": "GitHub push failed", "data": {"status": resp.status, "error": error[:200]}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+                    # #endregion
                     return False
                     
     except Exception as e:
         logger.error(f"GitHub push error: {e}")
+        # #region agent log
+        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "bot.py:371", "message": "GitHub push exception", "data": {"error": str(e)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+        # #endregion
         return False
 
 
@@ -407,18 +493,18 @@ async def ensure_esign_setup() -> bool:
     """Create all required directories and files on first run."""
     try:
         # Create main directory (including parents)
-        ESIGN_BASE_PATH.mkdir(parents=True, exist_ok=True)
+        ESIGN_PATH.mkdir(parents=True, exist_ok=True)
         
         # Create versions subfolder
         VERSIONS_PATH.mkdir(parents=True, exist_ok=True)
         
         # Test write permission
-        test_file = ESIGN_BASE_PATH / ".write_test"
+        test_file = ESIGN_PATH / ".write_test"
         try:
             test_file.touch()
             test_file.unlink()
         except PermissionError:
-            logger.error(f"No write permission to {ESIGN_BASE_PATH}")
+            logger.error(f"No write permission to {ESIGN_PATH}")
             return False
         
         # Create changelog.txt if missing
@@ -438,7 +524,7 @@ async def ensure_esign_setup() -> bool:
         if not SOURCE_JSON_PATH.exists():
             await save_source_json({"apps": []})
         
-        logger.info(f"ESign setup complete at {ESIGN_BASE_PATH}")
+        logger.info(f"ESign setup complete at {ESIGN_PATH}")
         return True
         
     except Exception as e:
@@ -542,6 +628,57 @@ def build_confirmation_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def build_version_delete_keyboard(versions: list) -> InlineKeyboardMarkup:
+    """Build keyboard with version buttons for deletion."""
+    buttons = []
+    # Group buttons in rows of 2
+    for i in range(0, len(versions), 2):
+        row = []
+        for j in range(2):
+            if i + j < len(versions):
+                version = versions[i + j]
+                version_str = version.get("version", "unknown")
+                date_str = version.get("date", "")[:10] if version.get("date") else ""
+                # Check if this is an untracked file (has "path" key)
+                is_untracked = "path" in version
+                # Check if this is a GitHub release (has "source" key)
+                is_github = version.get("source") == "github"
+                
+                if is_untracked:
+                    prefix = "⚠️"
+                    display_name = version.get("filename", version_str)
+                    button_text = f"{prefix} {display_name}"
+                elif is_github:
+                    prefix = "🌐"
+                    button_text = f"{prefix} {version_str}"
+                else:
+                    prefix = "🗑️"
+                    button_text = f"{prefix} {version_str}"
+                    
+                if date_str:
+                    button_text += f" ({date_str})"
+                    
+                # Include type marker in callback data
+                if is_untracked:
+                    callback_data = f"delete_version:{version_str}:untracked:{version.get('filename', '')}"
+                elif is_github:
+                    callback_data = f"delete_version:{version_str}:github"
+                else:
+                    callback_data = f"delete_version:{version_str}:tracked"
+                row.append(InlineKeyboardButton(
+                    text=button_text,
+                    callback_data=callback_data
+                ))
+        buttons.append(row)
+    
+    # Add cancel button
+    buttons.append([
+        InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_delete")
+    ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 # =============================================================================
 # COMMAND HANDLERS
 # =============================================================================
@@ -554,20 +691,69 @@ async def cmd_start(message: Message) -> None:
         await message.answer("⛔ Access denied. This bot is private.")
         return
 
+    source_url = f"{VERCEL_URL}/source.json"
     help_text = (
         "🚀 **ESign Repository Bot**\n\n"
         "Manage your IPA repository for ESign/Feather apps.\n\n"
-        "**How to use:**\n"
-        "1️⃣ Forward an IPA file to this bot\n"
-        "2️⃣ Review and confirm the upload\n"
-        "3️⃣ Bot uploads to GitHub & updates Vercel\n\n"
         "**Commands:**\n"
-        "• `/start` - Show this help\n"
+        "• `/send` - Upload a new IPA\n"
+        "• `/stop` - Cancel current operation\n"
         "• `/repoinfo` - Repository status\n"
-        "• `/setchangelog [text]` - Set changelog\n\n"
-        f"**Repository URL:**\n`{VERCEL_URL}`"
+        "• `/setchangelog [text]` - Set changelog\n"
+        "• `/deleteversion` - Delete a version\n"
+        "• `/syncgithub` - Force push source.json to GitHub\n\n"
+        f"**Repository URL:**\n`{VERCEL_URL}`\n\n"
+        f"**ESign Source URL:**\n`{source_url}`"
     )
     await message.answer(help_text, parse_mode=ParseMode.MARKDOWN)
+
+
+@router.message(Command("send"))
+async def cmd_send(message: Message, state: FSMContext) -> None:
+    """Start the IPA upload wizard."""
+    if not is_owner(message.from_user.id):
+        return
+
+    # Clear any existing state
+    await state.clear()
+    pending_uploads.pop(message.from_user.id, None)
+    
+    await state.set_state(UploadStates.waiting_for_ipa)
+    
+    changelog = await load_changelog()
+    
+    await message.answer(
+        "📤 **Upload IPA**\n\n"
+        "Send or forward an IPA file to upload.\n\n"
+        f"📝 **Current changelog:**\n_{changelog}_\n\n"
+        "💡 **Tip:** Forward from Saved Messages for fast upload!\n\n"
+        "❌ Cancel: /stop",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+@router.message(Command("stop"))
+async def cmd_stop(message: Message, state: FSMContext) -> None:
+    """Cancel any ongoing operation."""
+    if not is_owner(message.from_user.id):
+        return
+
+    current_state = await state.get_state()
+    
+    # Clear state and pending uploads
+    await state.clear()
+    pending_uploads.pop(message.from_user.id, None)
+    
+    if current_state:
+        await message.answer(
+            "⏹️ **Operation cancelled.**",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    else:
+        await message.answer(
+            "ℹ️ Nothing to cancel.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
 
 
 @router.message(Command("repoinfo"))
@@ -627,14 +813,141 @@ async def cmd_setchangelog(message: Message) -> None:
         await message.answer("❌ Failed to save changelog. Check permissions.")
 
 
+@router.message(Command("syncgithub"))
+async def cmd_syncgithub(message: Message) -> None:
+    """Force push source.json to GitHub."""
+    if not is_owner(message.from_user.id):
+        return
+
+    await message.answer("🔄 **Pushing source.json to GitHub...**", parse_mode=ParseMode.MARKDOWN)
+    
+    try:
+        if not GITHUB_TOKEN:
+            await message.answer("❌ GitHub token not configured", parse_mode=ParseMode.MARKDOWN)
+            return
+        
+        success = await push_file_to_github(
+            SOURCE_JSON_PATH,
+            "esign/source.json",
+            "Force sync source.json"
+        )
+        
+        if success:
+            await message.answer(
+                "✅ **Successfully pushed source.json to GitHub!**\n\n"
+                "Vercel should auto-redeploy in a few seconds.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        else:
+            await message.answer(
+                "❌ **Failed to push to GitHub**\n\nCheck logs for details.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+    except Exception as e:
+        await message.answer(f"❌ **Error:** `{str(e)}`", parse_mode=ParseMode.MARKDOWN)
+
+
+@router.message(Command("deleteversion"))
+async def cmd_deleteversion(message: Message) -> None:
+    """Show list of versions to delete."""
+    if not is_owner(message.from_user.id):
+        return
+
+    history = await load_version_history()
+    versions = history.get("versions", [])
+    
+    # Also check for untracked IPA files
+    untracked_files = []
+    if VERSIONS_PATH.exists():
+        tracked_filenames = {v.get("filename", "") for v in versions}
+        for file_path in VERSIONS_PATH.glob("*.ipa"):
+            if file_path.name not in tracked_filenames:
+                # Try to extract version from filename
+                version_match = re.search(r"soundcloud_([\d.]+)\.ipa", file_path.name)
+                if version_match:
+                    untracked_version = version_match.group(1)
+                else:
+                    untracked_version = "unknown"
+                untracked_files.append({
+                    "filename": file_path.name,
+                    "version": untracked_version,
+                    "size": file_path.stat().st_size,
+                    "date": datetime.fromtimestamp(file_path.stat().st_mtime).strftime("%Y-%m-%d"),
+                })
+    
+    # Check main IPA file in esign directory if it exists
+    esign_ipa = ESIGN_PATH / "soundcloud.ipa"
+    if esign_ipa.exists():
+        # Check if it's tracked
+        is_tracked = any(v.get("filename") == "soundcloud.ipa" or MAIN_IPA_PATH == esign_ipa for v in versions)
+        if not is_tracked:
+            # Use a unique identifier for this untracked file
+            untracked_files.append({
+                "filename": "soundcloud.ipa",
+                "version": "esign/soundcloud.ipa",  # Unique identifier
+                "size": esign_ipa.stat().st_size,
+                "date": datetime.fromtimestamp(esign_ipa.stat().st_mtime).strftime("%Y-%m-%d"),
+                "path": "esign",  # Mark as untracked
+            })
+    
+    # Also check source.json for versions that aren't tracked locally (GitHub releases)
+    source_versions = []
+    source = await load_source_json()
+    if source.get("apps"):
+        tracked_versions = {v.get("version", "") for v in versions}
+        for app in source["apps"]:
+            if app.get("versions"):
+                for sv in app["versions"]:
+                    sv_version = sv.get("version", "")
+                    if sv_version and sv_version not in tracked_versions:
+                        # This version is in source.json but not in version_history
+                        source_versions.append({
+                            "version": sv_version,
+                            "date": sv.get("date", "")[:10] if sv.get("date") else "",
+                            "size": sv.get("size", 0),
+                            "downloadURL": sv.get("downloadURL", ""),
+                            "source": "github",  # Mark as GitHub release
+                        })
+    
+    if not versions and not untracked_files and not source_versions:
+        await message.answer(
+            "📦 **No versions found**\n\nThere are no versions to delete.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return
+    
+    # Sort versions by date (newest first)
+    versions_sorted = sorted(versions, key=lambda x: x.get("date", ""), reverse=True)
+    
+    # Build message text
+    current_version = history.get("current_version", "")
+    text = "🗑️ **Delete Version**\n\n"
+    text += f"📚 **Tracked versions:** {len(versions)}\n"
+    if untracked_files:
+        text += f"⚠️ **Untracked files:** {len(untracked_files)}\n"
+    if source_versions:
+        text += f"🌐 **GitHub releases:** {len(source_versions)}\n"
+    text += f"📱 **Current version:** `{current_version or 'None'}`\n\n"
+    text += "Select a version to delete:"
+    
+    # Combine tracked, untracked, and source versions for display
+    all_items = versions_sorted + untracked_files + source_versions
+    
+    await message.answer(
+        text,
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=build_version_delete_keyboard(all_items),
+    )
+
+
 # =============================================================================
-# DOCUMENT HANDLER
+# DOCUMENT HANDLER (only active after /send)
 # =============================================================================
 
 
-@router.message(F.document)
-async def handle_document(message: Message) -> None:
-    """Handle forwarded IPA files."""
+@router.message(F.document, StateFilter(UploadStates.waiting_for_ipa))
+async def handle_document(message: Message, state: FSMContext) -> None:
+    """Handle forwarded IPA files (only after /send)."""
     if not is_owner(message.from_user.id):
         return
 
@@ -643,6 +956,10 @@ async def handle_document(message: Message) -> None:
 
     # Check if it's an IPA file
     if not filename.lower().endswith(".ipa"):
+        await message.answer(
+            "❌ **Not an IPA file**\n\nPlease send a `.ipa` file.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
         return
 
     logger.info(f"IPA detected: {filename}")
@@ -652,6 +969,41 @@ async def handle_document(message: Message) -> None:
     size = doc.file_size
     changelog = await load_changelog()
 
+    # Try to find matching file in Saved Messages (for fast Telethon download)
+    saved_msg_id = None
+    try:
+        if telethon_client is None:
+            logger.warning("Telethon client not initialized!")
+        elif not telethon_client.is_connected():
+            logger.warning("Telethon client not connected!")
+        else:
+            logger.info(f"Searching Saved Messages for: {filename}")
+            saved_messages = await telethon_client.get_messages('me', limit=50)
+            logger.info(f"Found {len(saved_messages)} messages in Saved Messages")
+            
+            for msg in saved_messages:
+                if msg.media and hasattr(msg.media, 'document') and msg.media.document:
+                    msg_doc = msg.media.document
+                    msg_filename = None
+                    for attr in msg_doc.attributes:
+                        if hasattr(attr, 'file_name'):
+                            msg_filename = attr.file_name
+                            break
+                    
+                    if msg_filename:
+                        logger.debug(f"Checking file: {msg_filename}")
+                    
+                    # Match by filename
+                    if msg_filename and msg_filename == filename:
+                        saved_msg_id = msg.id
+                        logger.info(f"✅ Found IPA in Saved Messages, msg_id={saved_msg_id}")
+                        break
+            
+            if not saved_msg_id:
+                logger.info(f"❌ File '{filename}' not found in last 50 Saved Messages")
+    except Exception as e:
+        logger.warning(f"Could not search Saved Messages: {e}")
+
     # Store pending upload info
     pending_uploads[message.from_user.id] = {
         "file_id": doc.file_id,
@@ -660,14 +1012,20 @@ async def handle_document(message: Message) -> None:
         "size": size,
         "message_id": message.message_id,
         "chat_id": message.chat.id,
+        "saved_msg_id": saved_msg_id,  # Will be None if not found in Saved Messages
     }
 
+    # Transition to confirmation state
+    await state.set_state(UploadStates.waiting_for_confirmation)
+
     # Show confirmation
+    source_info = "⚡ **Fast download** (from Saved Messages)" if saved_msg_id else "📥 Will download via bot API"
     text = (
         "📦 **Detected IPA File**\n\n"
         f"📄 **Filename:** `{filename}`\n"
         f"🏷️ **Version:** `{version}`\n"
-        f"💾 **Size:** {format_size(size)}\n\n"
+        f"💾 **Size:** {format_size(size)}\n"
+        f"{source_info}\n\n"
         f"📝 **Changelog:**\n_{changelog}_\n\n"
         "Press **Confirm** to upload or **Edit Changelog** to modify."
     )
@@ -685,7 +1043,7 @@ async def handle_document(message: Message) -> None:
 
 
 @router.callback_query(F.data == "cancel_upload")
-async def callback_cancel(callback: CallbackQuery) -> None:
+async def callback_cancel(callback: CallbackQuery, state: FSMContext) -> None:
     """Cancel pending upload."""
     if not is_owner(callback.from_user.id):
         return
@@ -693,6 +1051,7 @@ async def callback_cancel(callback: CallbackQuery) -> None:
     if callback.from_user.id in pending_uploads:
         del pending_uploads[callback.from_user.id]
 
+    await state.clear()
     await callback.message.edit_text("❌ Upload cancelled.")
     await callback.answer()
 
@@ -730,8 +1089,472 @@ async def handle_changelog_input(message: Message, state: FSMContext) -> None:
     await state.clear()
 
 
+@router.callback_query(F.data == "cancel_delete")
+async def callback_cancel_delete(callback: CallbackQuery, state: FSMContext) -> None:
+    """Cancel version deletion."""
+    if not is_owner(callback.from_user.id):
+        return
+
+    await state.clear()
+    await callback.message.edit_text("❌ Deletion cancelled.")
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("delete_version:"))
+async def callback_delete_version(callback: CallbackQuery, state: FSMContext) -> None:
+    """Show confirmation dialog for version deletion."""
+    if not is_owner(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    # Extract version, type, and optional filename from callback data
+    parts = callback.data.split(":")
+    version_to_delete = parts[1]
+    delete_type = parts[2] if len(parts) > 2 else "tracked"
+    filename_to_delete = parts[3] if len(parts) > 3 and delete_type == "untracked" else None
+    
+    # Load version info to show in confirmation
+    history = await load_version_history()
+    versions = history.get("versions", [])
+    version_info = None
+    is_untracked = False
+    is_github = False
+    
+    if delete_type == "untracked" and filename_to_delete:
+        # This is an untracked file
+        file_path = VERSIONS_PATH / filename_to_delete if filename_to_delete != "soundcloud.ipa" else ESIGN_PATH / "soundcloud.ipa"
+        if file_path.exists():
+            version_info = {
+                "version": version_to_delete,
+                "filename": filename_to_delete,
+                "size": file_path.stat().st_size,
+                "date": datetime.fromtimestamp(file_path.stat().st_mtime).strftime("%Y-%m-%d"),
+            }
+            is_untracked = True
+    elif delete_type == "github":
+        # This is a GitHub release (in source.json but not tracked locally)
+        source = await load_source_json()
+        if source.get("apps"):
+            for app in source["apps"]:
+                if app.get("versions"):
+                    for sv in app["versions"]:
+                        if sv.get("version") == version_to_delete:
+                            version_info = {
+                                "version": version_to_delete,
+                                "size": sv.get("size", 0),
+                                "date": sv.get("date", ""),
+                                "downloadURL": sv.get("downloadURL", ""),
+                            }
+                            is_github = True
+                            break
+    else:
+        # Look for tracked version
+        for v in versions:
+            if v.get("version") == version_to_delete:
+                version_info = v
+                break
+    
+    if not version_info:
+        await callback.answer("Version not found", show_alert=True)
+        return
+    
+    # Store version and filename to delete in state
+    await state.update_data(
+        version_to_delete=version_to_delete, 
+        filename_to_delete=filename_to_delete, 
+        is_untracked=is_untracked,
+        is_github=is_github
+    )
+    await state.set_state(DeleteVersionStates.waiting_for_confirmation)
+    
+    # Show confirmation message
+    date_str = version_info.get("date", "")[:10] if version_info.get("date") else "Unknown date"
+    size_str = format_size(version_info.get("size", 0))
+    is_current = history.get("current_version") == version_to_delete
+    
+    if is_untracked:
+        confirmation_text = (
+            f"⚠️ **Confirm Deletion (Untracked File)**\n\n"
+            f"🗑️ **Version:** `{version_to_delete}`\n"
+            f"📄 **Filename:** `{filename_to_delete}`\n"
+            f"📅 **Date:** {date_str}\n"
+            f"💾 **Size:** {size_str}\n\n"
+            f"⚠️ **This file is not tracked in version history!**\n\n"
+        )
+    elif is_github:
+        confirmation_text = (
+            f"🌐 **Confirm Deletion (GitHub Release)**\n\n"
+            f"🗑️ **Version:** `{version_to_delete}`\n"
+            f"📅 **Date:** {date_str}\n"
+            f"💾 **Size:** {size_str}\n\n"
+            f"⚠️ **This will delete the GitHub release!**\n\n"
+        )
+    else:
+        confirmation_text = (
+            f"⚠️ **Confirm Deletion**\n\n"
+            f"🗑️ **Version:** `{version_to_delete}`\n"
+            f"📅 **Date:** {date_str}\n"
+            f"💾 **Size:** {size_str}\n"
+        )
+        if is_current:
+            confirmation_text += "⚠️ **This is the current version!**\n\n"
+    
+    confirmation_text += "Are you sure you want to delete this version?\n\nThis action cannot be undone."
+    
+    # Create confirmation keyboard
+    confirmation_keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Yes, Delete", callback_data="confirm_delete_version"),
+                InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_delete"),
+            ],
+        ]
+    )
+    
+    await callback.message.edit_text(
+        confirmation_text,
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=confirmation_keyboard,
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "confirm_delete_version")
+async def callback_confirm_delete_version(callback: CallbackQuery, state: FSMContext) -> None:
+    """Actually delete the version after confirmation."""
+    if not is_owner(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    # Get version to delete from state
+    data = await state.get_data()
+    version_to_delete = data.get("version_to_delete")
+    filename_to_delete = data.get("filename_to_delete")
+    is_untracked = data.get("is_untracked", False)
+    is_github = data.get("is_github", False)
+    
+    if not version_to_delete:
+        await callback.answer("No version selected", show_alert=True)
+        await state.clear()
+        return
+    
+    await callback.answer("Deleting version...")
+    
+    try:
+        # Handle GitHub releases (in source.json but not tracked locally)
+        if is_github:
+            # Delete GitHub release
+            release_deleted = await delete_github_release(version_to_delete)
+            
+            # Update source.json to remove the version
+            source = await load_source_json()
+            updated_source = False
+            if source.get("apps"):
+                for app in source["apps"]:
+                    if app.get("versions"):
+                        original_count = len(app["versions"])
+                        app["versions"] = [v for v in app["versions"] if v.get("version") != version_to_delete]
+                        if len(app["versions"]) < original_count:
+                            updated_source = True
+                            # Update app-level fields
+                            if app.get("versions") and len(app["versions"]) > 0:
+                                versions_sorted = sorted(app["versions"], key=lambda x: x.get("date", ""), reverse=True)
+                                latest = versions_sorted[0]
+                                app["version"] = latest.get("version", "")
+                                app["versionDate"] = latest.get("date", "")
+                                app["size"] = latest.get("size", 0)
+                                app["downloadURL"] = latest.get("downloadURL", "")
+                            else:
+                                app["version"] = ""
+                                app["versionDate"] = ""
+                                app["size"] = 0
+                                app["downloadURL"] = ""
+            
+            # Push updated source.json to GitHub
+            github_pushed = False
+            if updated_source:
+                await save_source_json(source)
+                if GITHUB_TOKEN:
+                    try:
+                        github_pushed = await push_file_to_github(
+                            SOURCE_JSON_PATH,
+                            "esign/source.json",
+                            f"Remove version {version_to_delete} from repository"
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to push source.json to GitHub: {e}")
+            
+            release_status = "✅" if release_deleted else "⚠️ (not found)"
+            source_status = "✅ (pushed to GitHub)" if github_pushed else "⚠️ (local only)" if updated_source else "⚠️"
+            
+            await callback.message.edit_text(
+                f"✅ **GitHub Version Deleted**\n\n"
+                f"🗑️ Deleted version: `{version_to_delete}`\n"
+                f"🌐 **GitHub release:** {release_status}\n"
+                f"📄 **Source updated:** {source_status}",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            await state.clear()
+            await callback.answer()
+            return
+        
+        # Handle untracked files differently
+        if is_untracked and filename_to_delete:
+            # Delete untracked file directly
+            if filename_to_delete == "soundcloud.ipa":
+                file_path = ESIGN_PATH / filename_to_delete
+            else:
+                file_path = VERSIONS_PATH / filename_to_delete
+            
+            if file_path.exists():
+                try:
+                    file_path.unlink()
+                    logger.info(f"Deleted untracked file: {filename_to_delete}")
+                    
+                    # Also update source.json to ensure it's clean
+                    # Check if this file might be referenced in source.json by URL
+                    source = await load_source_json()
+                    updated_source = False
+                    
+                    # #region agent log
+                    log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "bot.py:1118", "message": "Checking source.json for untracked file deletion", "data": {"filename": filename_to_delete, "version": version_to_delete}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+                    # #endregion
+                    
+                    if source.get("apps"):
+                        for app in source["apps"]:
+                            # Check if downloadURL points to this file or if version matches
+                            download_url = app.get("downloadURL", "")
+                            app_version = app.get("version", "")
+                            
+                            # Check if this version or file is referenced
+                            if (filename_to_delete in download_url or 
+                                "soundcloud.ipa" in download_url or
+                                version_to_delete in app_version or
+                                version_to_delete in download_url):
+                                # This might be referencing the deleted file
+                                # Remove it from versions array if it matches
+                                if app.get("versions"):
+                                    # Try to find and remove any version that might match
+                                    original_count = len(app["versions"])
+                                    app["versions"] = [
+                                        v for v in app["versions"] 
+                                        if (filename_to_delete not in v.get("downloadURL", "") and
+                                            version_to_delete != v.get("version", ""))
+                                    ]
+                                    if len(app["versions"]) < original_count:
+                                        updated_source = True
+                                        
+                                        # #region agent log
+                                        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "bot.py:1140", "message": "Removed version from source.json", "data": {"removed_count": original_count - len(app["versions"]), "remaining_count": len(app["versions"])}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+                                        # #endregion
+                                        
+                                        # Update app-level fields if needed
+                                        if app.get("versions") and len(app["versions"]) > 0:
+                                            versions_sorted = sorted(app["versions"], key=lambda x: x.get("date", ""), reverse=True)
+                                            latest = versions_sorted[0]
+                                            app["version"] = latest.get("version", "")
+                                            app["versionDate"] = latest.get("date", "")
+                                            app["size"] = latest.get("size", 0)
+                                            app["downloadURL"] = latest.get("downloadURL", "")
+                                        else:
+                                            app["version"] = ""
+                                            app["versionDate"] = ""
+                                            app["size"] = 0
+                                            app["downloadURL"] = ""
+                                elif app_version == version_to_delete or filename_to_delete in download_url:
+                                    # App-level fields reference this file/version
+                                    updated_source = True
+                                    app["version"] = ""
+                                    app["versionDate"] = ""
+                                    app["size"] = 0
+                                    app["downloadURL"] = ""
+                                    
+                                    # #region agent log
+                                    log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "bot.py:1160", "message": "Cleared app-level fields in source.json", "data": {}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+                                    # #endregion
+                    
+                    # Push updated source.json to GitHub if it was modified
+                    github_pushed = False
+                    if updated_source:
+                        # #region agent log
+                        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "bot.py:1165", "message": "Saving updated source.json", "data": {"updated": True}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+                        # #endregion
+                        await save_source_json(source)
+                        if GITHUB_TOKEN:
+                            try:
+                                github_pushed = await push_file_to_github(
+                                    SOURCE_JSON_PATH,
+                                    "esign/source.json",
+                                    f"Remove untracked file {filename_to_delete} from repository"
+                                )
+                                # #region agent log
+                                log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "bot.py:1175", "message": "GitHub push result for untracked file deletion", "data": {"pushed": github_pushed}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+                                # #endregion
+                                if github_pushed:
+                                    logger.info("Pushed updated source.json to GitHub after untracked file deletion")
+                            except Exception as e:
+                                logger.error(f"Failed to push source.json to GitHub: {e}")
+                                # #region agent log
+                                log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "bot.py:1182", "message": "GitHub push exception", "data": {"error": str(e)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+                                # #endregion
+                    
+                    push_status = "✅ (pushed to GitHub)" if github_pushed else "⚠️ (local only)" if updated_source else ""
+                    success_text = (
+                        f"✅ **Untracked File Deleted**\n\n"
+                        f"🗑️ Deleted: `{filename_to_delete}`\n"
+                        f"📱 Version: `{version_to_delete}`"
+                    )
+                    if push_status:
+                        success_text += f"\n\n🔄 **Source updated:** {push_status}"
+                    
+                    await callback.message.edit_text(
+                        success_text,
+                        parse_mode=ParseMode.MARKDOWN,
+                    )
+                    await state.clear()
+                    await callback.answer()
+                    return
+                except Exception as e:
+                    logger.error(f"Error deleting untracked file {filename_to_delete}: {e}")
+                    await callback.message.edit_text(
+                        f"❌ **Error**\n\nFailed to delete file: `{str(e)}`",
+                        parse_mode=ParseMode.MARKDOWN,
+                    )
+                    await state.clear()
+                    await callback.answer()
+                    return
+            else:
+                await callback.message.edit_text(
+                    f"❌ **File not found**\n\nFile `{filename_to_delete}` does not exist.",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+                await state.clear()
+                await callback.answer()
+                return
+        
+        # Handle tracked versions
+        # Load version history
+        history = await load_version_history()
+        versions = history.get("versions", [])
+        current_version = history.get("current_version", "")
+        
+        # Find and remove the version
+        version_found = False
+        deleted_filename = None
+        for i, v in enumerate(versions):
+            if v.get("version") == version_to_delete:
+                version_found = True
+                deleted_filename = v.get("filename", "")
+                
+                # Delete the IPA file if it exists
+                if deleted_filename:
+                    file_path = VERSIONS_PATH / deleted_filename
+                    if file_path.exists():
+                        try:
+                            file_path.unlink()
+                            logger.info(f"Deleted version file: {deleted_filename}")
+                        except Exception as e:
+                            logger.error(f"Error deleting file {deleted_filename}: {e}")
+                
+                # Remove from versions list
+                versions.pop(i)
+                break
+        
+        if not version_found:
+            await callback.message.edit_text(
+                f"❌ **Version not found**\n\nVersion `{version_to_delete}` was not found in the repository.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            await state.clear()
+            await callback.answer()
+            return
+        
+        # Update current_version if we deleted the current one
+        if current_version == version_to_delete:
+            if versions:
+                # Set to the most recent version
+                versions_sorted = sorted(versions, key=lambda x: x.get("date", ""), reverse=True)
+                history["current_version"] = versions_sorted[0].get("version", "")
+            else:
+                history["current_version"] = ""
+        
+        # Update history
+        history["versions"] = versions
+        
+        # Save updated history
+        if await save_version_history(history):
+            # Always update source.json to remove deleted version
+            source = await load_source_json()
+            if source.get("apps"):
+                for app in source["apps"]:
+                    # Remove deleted version from versions array
+                    if app.get("versions"):
+                        app["versions"] = [v for v in app.get("versions", []) if v.get("version") != version_to_delete]
+                    
+                    # Update app-level fields if we deleted the current version or if no versions left
+                    if current_version == version_to_delete or not app.get("versions"):
+                        if app.get("versions") and len(app["versions"]) > 0:
+                            # Set to most recent remaining version
+                            versions_sorted = sorted(app["versions"], key=lambda x: x.get("date", ""), reverse=True)
+                            latest = versions_sorted[0]
+                            app["version"] = latest.get("version", "")
+                            app["versionDate"] = latest.get("date", "")
+                            app["size"] = latest.get("size", 0)
+                            app["downloadURL"] = latest.get("downloadURL", "")
+                        else:
+                            # No versions left
+                            app["version"] = ""
+                            app["versionDate"] = ""
+                            app["size"] = 0
+                            app["downloadURL"] = ""
+            
+            await save_source_json(source)
+            
+            # Push updated source.json to GitHub (triggers Vercel redeploy)
+            github_pushed = False
+            if GITHUB_TOKEN:
+                try:
+                    github_pushed = await push_file_to_github(
+                        SOURCE_JSON_PATH,
+                        "esign/source.json",
+                        f"Remove version {version_to_delete} from repository"
+                    )
+                    if github_pushed:
+                        logger.info("Pushed updated source.json to GitHub - Vercel will auto-deploy")
+                except Exception as e:
+                    logger.error(f"Failed to push source.json to GitHub: {e}")
+            
+            push_status = "✅ (pushed to GitHub)" if github_pushed else "⚠️ (local only)"
+            await callback.message.edit_text(
+                f"✅ **Version Deleted**\n\n"
+                f"🗑️ Deleted version: `{version_to_delete}`\n"
+                f"📚 Remaining versions: {len(versions)}\n"
+                f"📱 Current version: `{history['current_version'] or 'None'}`\n\n"
+                f"🔄 **Source updated:** {push_status}",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            logger.info(f"Deleted version: {version_to_delete}")
+        else:
+            await callback.message.edit_text(
+                "❌ **Deletion Failed**\n\nFailed to save updated version history.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        
+        await state.clear()
+        await callback.answer()
+        
+    except Exception as e:
+        logger.error(f"Error deleting version: {e}")
+        await callback.message.edit_text(
+            f"❌ **Error**\n\nFailed to delete version: `{str(e)}`",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        await state.clear()
+        await callback.answer()
+
+
 @router.callback_query(F.data == "confirm_upload")
-async def callback_confirm(callback: CallbackQuery, telethon_client: TelegramClient, bot: Bot) -> None:
+async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_client: TelegramClient, bot: Bot) -> None:
     """Confirm and start download."""
     if not is_owner(callback.from_user.id):
         await callback.answer("Access denied", show_alert=True)
@@ -749,7 +1572,7 @@ async def callback_confirm(callback: CallbackQuery, telethon_client: TelegramCli
 
     # Update message to show progress
     progress_msg = await callback.message.edit_text(
-        "📥 **Preparing download...**",
+        "📥 **Downloading IPA...**",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -762,26 +1585,51 @@ async def callback_confirm(callback: CallbackQuery, telethon_client: TelegramCli
             total_size=upload["size"],
         )
 
-        # Download using Telethon userbot (fast!)
         logger.info(f"Starting download: {upload['filename']}")
 
-        # Get the message with the file via Telethon
-        telethon_message = await telethon_client.get_messages(
-            upload["chat_id"],
-            ids=upload["message_id"],
-        )
-
-        if not telethon_message or not telethon_message.document:
-            raise Exception("Could not find the file message")
-
-        # Download to main IPA path
-        await telethon_client.download_media(
-            telethon_message,
-            file=str(MAIN_IPA_PATH),
-            progress_callback=lambda current, total: asyncio.create_task(
-                tracker.update(current, total)
-            ),
-        )
+        # Check if we have the file in Saved Messages (fast path)
+        saved_msg_id = upload.get("saved_msg_id")
+        
+        if saved_msg_id:
+            # Fast download from Saved Messages via Telethon
+            logger.info(f"Downloading from Saved Messages (msg_id={saved_msg_id})")
+            
+            saved_msg = await telethon_client.get_messages('me', ids=saved_msg_id)
+            
+            if not saved_msg or not saved_msg.media:
+                raise Exception("Could not retrieve file from Saved Messages")
+            
+            await telethon_client.download_media(
+                saved_msg,
+                file=str(MAIN_IPA_PATH),
+                progress_callback=lambda current, total: asyncio.create_task(
+                    tracker.update(current, total)
+                ),
+            )
+            logger.info("Downloaded via Telethon from Saved Messages")
+            
+        else:
+            # Fallback to aiogram download (slower, but works for direct messages)
+            logger.info("Downloading via aiogram (file not in Saved Messages)")
+            
+            try:
+                file = await bot.get_file(upload["file_id"])
+                
+                # Download with progress updates
+                downloaded = 0
+                chunk_size = 1024 * 1024  # 1MB chunks
+                
+                async with aiofiles.open(MAIN_IPA_PATH, "wb") as f:
+                    async for chunk in bot.download_file(file.file_path, chunk_size=chunk_size):
+                        await f.write(chunk)
+                        downloaded += len(chunk)
+                        await tracker.update(downloaded, upload["size"])
+                
+                logger.info("Downloaded via aiogram")
+                
+            except Exception as aiogram_err:
+                logger.error(f"Aiogram download failed: {aiogram_err}")
+                raise Exception(f"Download failed: {aiogram_err}")
 
         # Verify file size
         if not MAIN_IPA_PATH.exists() or MAIN_IPA_PATH.stat().st_size == 0:
@@ -811,7 +1659,15 @@ async def callback_confirm(callback: CallbackQuery, telethon_client: TelegramCli
             parse_mode=ParseMode.MARKDOWN,
         )
         
+        # #region agent log
+        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:1219", "message": "Before GitHub release upload", "data": {"version": version, "file_exists": MAIN_IPA_PATH.exists(), "file_size": MAIN_IPA_PATH.stat().st_size if MAIN_IPA_PATH.exists() else 0, "has_github_config": bool(GITHUB_TOKEN and GITHUB_OWNER and GITHUB_REPO)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+        # #endregion
+        
         github_download_url = await upload_to_github_release(MAIN_IPA_PATH, version, changelog)
+        
+        # #region agent log
+        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:1222", "message": "After GitHub release upload", "data": {"success": github_download_url is not None, "download_url": github_download_url or "None"}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+        # #endregion
         
         if github_download_url:
             download_url = github_download_url
@@ -852,25 +1708,49 @@ async def callback_confirm(callback: CallbackQuery, telethon_client: TelegramCli
         # Save version history (atomic)
         await save_version_history(history)
 
-        # Update source.json for ESign/Feather
+        # Update source.json for ESign/Feather (correct Feather format with duplicate fields)
+        now_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
         source = {
+            "name": "SoundCloud Repository",
+            "identifier": "com.soundcloud.repo",
+            "iconURL": f"{VERCEL_URL}/soundcloud-logo.png",
+            "website": f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}",
             "apps": [
                 {
                     "name": "SoundCloud",
                     "bundleIdentifier": "com.soundcloud.TouchApp",
+                    "developerName": "Random32352",
+                    "iconURL": f"{VERCEL_URL}/soundcloud-logo.png",
+                    "localizedDescription": changelog,
+                    "subtitle": "Modified SoundCloud",
+                    "tintColor": "FF9500",
+                    "versions": [
+                        {
+                            "version": version,
+                            "date": now_iso,
+                            "size": actual_size,
+                            "downloadURL": download_url,
+                        }
+                    ],
+                    "appPermissions": {},
+                    "screenshotURLs": [],
+                    # Duplicate fields required by Feather
                     "version": version,
-                    "versionDate": now,
-                    "downloadURL": download_url,
+                    "versionDate": now_iso,
                     "size": actual_size,
-                    "category": "Music",
+                    "downloadURL": download_url,
                 }
-            ]
+            ],
+            "news": [],
         }
         await save_source_json(source)
 
         # Push source.json to GitHub (triggers Vercel redeploy)
         github_pushed = False
         if GITHUB_TOKEN:
+            # #region agent log
+            log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "bot.py:1297", "message": "Before pushing source.json to GitHub", "data": {"source_json_exists": SOURCE_JSON_PATH.exists(), "has_github_token": bool(GITHUB_TOKEN)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+            # #endregion
             await bot.edit_message_text(
                 text="🔄 **Pushing to GitHub...**",
                 chat_id=callback.message.chat.id,
@@ -882,6 +1762,9 @@ async def callback_confirm(callback: CallbackQuery, telethon_client: TelegramCli
                 "esign/source.json",
                 f"Update source.json for v{version}"
             )
+            # #region agent log
+            log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "bot.py:1308", "message": "After pushing source.json to GitHub", "data": {"success": github_pushed}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
+            # #endregion
             if github_pushed:
                 logger.info("Pushed source.json to GitHub - Vercel will auto-deploy")
 
@@ -916,6 +1799,7 @@ async def callback_confirm(callback: CallbackQuery, telethon_client: TelegramCli
         )
 
         logger.info(f"Upload complete: v{version}")
+        await state.clear()
 
     except Exception as e:
         logger.error(f"Upload failed: {e}")
@@ -949,7 +1833,7 @@ async def main() -> None:
     print("\n" + "=" * 50)
     print("🚀 ESign Repository Bot".center(50))
     print("=" * 50)
-    print(f"📂 Path: {ESIGN_BASE_PATH}")
+    print(f"📂 Path: {ESIGN_PATH}")
     print(f"🌐 IP:   {get_local_ip()}")
     print(f"🔗 URL:  {get_repository_url()}")
     print("=" * 50 + "\n")
@@ -961,7 +1845,8 @@ async def main() -> None:
     
     logger.info("Directory setup complete")
 
-    # Initialize Telethon client
+    # Initialize Telethon client (global)
+    global telethon_client
     telethon_client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
     await telethon_client.start()
     logger.info("Telethon userbot connected")
@@ -977,6 +1862,19 @@ async def main() -> None:
         data["telethon_client"] = telethon_client
         data["bot"] = bot
         return await handler(event, data)
+
+    # Register bot commands for autocomplete menu
+    from aiogram.types import BotCommand
+    commands = [
+        BotCommand(command="start", description="Show help"),
+        BotCommand(command="send", description="Upload a new IPA"),
+        BotCommand(command="stop", description="Cancel current operation"),
+        BotCommand(command="repoinfo", description="Repository status"),
+        BotCommand(command="setchangelog", description="Set changelog text"),
+        BotCommand(command="deleteversion", description="Delete a version"),
+        BotCommand(command="syncgithub", description="Force push source.json to GitHub"),
+    ]
+    await bot.set_my_commands(commands)
 
     print("✅ Bot is running! Press Ctrl+C to stop.\n")
 
