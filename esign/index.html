@@ -559,22 +559,17 @@
         });
 
         // #region agent log - H1, H2, H3
-        // Set URLs - Use unencoded URL (works better with iOS custom schemes)
+        // Set URLs - native browser behavior triggers iOS popup
         const sourceUrl = 'https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/source.json';
         const esignUrl = 'esign://addsource?url=' + sourceUrl;
         const featherUrl = 'feather://source/add?url=' + sourceUrl;
         
-        // Use click handlers to prevent browser URL encoding
-        document.getElementById('esign-btn').addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('Opening ESign with URL:', esignUrl);
-            window.location.href = esignUrl;
-        });
-        document.getElementById('feather-btn').addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('Opening Feather with URL:', featherUrl);
-            window.location.href = featherUrl;
-        });
+        // Set href directly - let native browser handle custom URL schemes
+        document.getElementById('esign-btn').href = esignUrl;
+        document.getElementById('feather-btn').href = featherUrl;
+        
+        console.log('ESign URL set:', esignUrl);
+        console.log('Feather URL set:', featherUrl);
         
         console.log('=== DEBUG ===');
         console.log('Source URL:', sourceUrl);
