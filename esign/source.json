@@ -1,6 +1,32 @@
 {
   "name": "SoundCloud Repository",
   "identifier": "com.soundcloud.repo",
+  "iconURL": "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/soundcloud-logo.png",
+  "website": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot",
   "sourceURL": "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/source.json",
-  "apps": []
+  "apps": [
+    {
+      "name": "SoundCloud",
+      "bundleIdentifier": "com.soundcloud.TouchApp",
+      "developerName": "Random32352",
+      "iconURL": "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/soundcloud-logo.png",
+      "localizedDescription": "SoundCloud with Go+ unlocked, HQ audio, and no ads.",
+      "subtitle": "Modified SoundCloud",
+      "tintColor": "FF9500",
+      "versions": [
+        {
+          "version": "8.42.3",
+          "date": "2025-12-16T15:47:16Z",
+          "size": 103441891,
+          "downloadURL": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot/releases/download/v8.42.3/soundcloud.ipa"
+        }
+      ],
+      "appPermissions": {},
+      "screenshotURLs": [],
+      "version": "8.42.3",
+      "versionDate": "2025-12-16T15:47:16Z",
+      "size": 103441891,
+      "downloadURL": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot/releases/download/v8.42.3/soundcloud.ipa"
+    }
+  ]
 }
