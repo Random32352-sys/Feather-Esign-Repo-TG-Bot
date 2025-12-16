@@ -564,8 +564,17 @@
         const esignUrl = 'esign://addsource?url=' + sourceUrl;
         const featherUrl = 'feather://source/add?url=' + sourceUrl;
         
-        document.getElementById('esign-btn').href = esignUrl;
-        document.getElementById('feather-btn').href = featherUrl;
+        // Use click handlers to prevent browser URL encoding
+        document.getElementById('esign-btn').addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Opening ESign with URL:', esignUrl);
+            window.location.href = esignUrl;
+        });
+        document.getElementById('feather-btn').addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Opening Feather with URL:', featherUrl);
+            window.location.href = featherUrl;
+        });
         
         console.log('=== DEBUG ===');
         console.log('Source URL:', sourceUrl);
