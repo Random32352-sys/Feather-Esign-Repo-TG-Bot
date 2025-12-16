@@ -561,11 +561,52 @@
         // #region agent log - DETAILED DEBUG
         const sourceUrl = 'https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/source.json';
         const esignUrl = 'esign://addsource?url=' + sourceUrl;
-        const featherUrl = 'feather://source/add?url=' + sourceUrl;
+
+        // Default to the standard one for the main button
+        const featherUrlMain = 'feather://source/' + sourceUrl;
 
         // Set href directly
         document.getElementById('esign-btn').href = esignUrl;
-        document.getElementById('feather-btn').href = featherUrl;
+        document.getElementById('feather-btn').href = featherUrlMain;
+
+        // DEBUG: Add multiple variations
+        const buttonsContainer = document.querySelector('.buttons');
+        const debugContainer = document.createElement('div');
+        debugContainer.style.marginTop = '20px';
+        debugContainer.style.display = 'flex';
+        debugContainer.style.flexDirection = 'column';
+        debugContainer.style.gap = '8px';
+        debugContainer.style.borderTop = '1px solid rgba(255,255,255,0.1)';
+        debugContainer.style.paddingTop = '15px';
+
+        const label = document.createElement('p');
+        label.textContent = 'DEBUG OPTIONS (Try all):';
+        label.style.color = '#888';
+        label.style.fontSize = '12px';
+        label.style.marginBottom = '5px';
+        debugContainer.appendChild(label);
+
+        const variations = [
+            { name: 'Standard (source/URL)', url: 'feather://source/' + sourceUrl },
+            { name: 'Query (source?url=URL)', url: 'feather://source?url=' + sourceUrl },
+            { name: 'Add Path (source/add?url=URL)', url: 'feather://source/add?url=' + sourceUrl },
+            { name: 'ESign Style (addsource?url=URL)', url: 'feather://addsource?url=' + sourceUrl },
+            { name: 'Encoded (source/ENCODED)', url: 'feather://source/' + encodeURIComponent(sourceUrl) }
+        ];
+
+        variations.forEach(v => {
+            const btn = document.createElement('a');
+            btn.href = v.url;
+            btn.className = 'btn btn-secondary';
+            btn.style.fontSize = '11px';
+            btn.style.padding = '8px 12px';
+            btn.style.background = 'rgba(255, 100, 0, 0.1)';
+            btn.textContent = v.name;
+            btn.onclick = (e) => console.log('Clicked Debug:', v.name, v.url);
+            debugContainer.appendChild(btn);
+        });
+
+        buttonsContainer.appendChild(debugContainer);
 
         console.log('========================================');
         console.log('🔧 DEBUG MODE - ESign Source Diagnostics');
