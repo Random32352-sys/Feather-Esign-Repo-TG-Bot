@@ -1,13 +1,25 @@
 {
+  "name": "SoundCloud Repository",
+  "identifier": "com.soundcloud.repo",
+  "iconURL": "https://esign-repo.vercel.app/soundcloud-logo.png",
+  "website": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot",
   "apps": [
     {
       "name": "SoundCloud",
       "bundleIdentifier": "com.soundcloud.TouchApp",
-      "version": "8.42.3",
-      "versionDate": "2025-12-16T15:47:16",
-      "downloadURL": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot/releases/download/v8.42.3/soundcloud.ipa",
-      "size": 103441891,
-      "category": "Music"
+      "developerName": "Random32352",
+      "iconURL": "https://esign-repo.vercel.app/soundcloud-logo.png",
+      "localizedDescription": "SoundCloud with Go+ unlocked, HQ audio, and no ads.",
+      "subtitle": "Modified SoundCloud",
+      "tintColor": "FF9500",
+      "versions": [],
+      "appPermissions": {},
+      "screenshotURLs": [],
+      "version": "",
+      "versionDate": "",
+      "size": 0,
+      "downloadURL": ""
     }
-  ]
+  ],
+  "news": []
 }
