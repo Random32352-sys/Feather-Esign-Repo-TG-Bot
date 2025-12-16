@@ -558,11 +558,12 @@
             }
         });
 
-        // Set URLs
-        const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '');
-        const sourceUrl = encodeURIComponent(baseUrl + '/source.json');
+        // Set URLs - Use unencoded URL (works better with iOS custom schemes)
+        const sourceUrl = 'https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/source.json';
         document.getElementById('esign-btn').href = 'esign://addsource?url=' + sourceUrl;
         document.getElementById('feather-btn').href = 'feather://source/add?url=' + sourceUrl;
+        
+        console.log('Source URL:', sourceUrl);
 
         // Load version
         fetch('source.json')
