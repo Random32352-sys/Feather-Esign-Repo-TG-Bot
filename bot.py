@@ -16,6 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import aiohttp
+
 import aiofiles
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.enums import ParseMode
@@ -43,6 +45,11 @@ OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
 ESIGN_PORT = int(os.getenv("ESIGN_PORT", "80"))
+
+# GitHub Configuration
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+GITHUB_OWNER = os.getenv("GITHUB_OWNER", "")
+GITHUB_REPO = os.getenv("GITHUB_REPO", "")
 
 # ESign paths (configurable via ESIGN_PATH env var)
 DEFAULT_ESIGN_PATH = r"C:\inetpub\wwwroot\esign"
@@ -214,6 +221,144 @@ async def save_source_json(source: dict) -> bool:
     except Exception as e:
         logger.error(f"Error saving source.json: {e}")
         return False
+
+
+# =============================================================================
+# GITHUB API FUNCTIONS
+# =============================================================================
+
+
+async def upload_to_github_release(file_path: Path, version: str, changelog: str) -> Optional[str]:
+    """Upload IPA to GitHub Releases and return the download URL."""
+    if not GITHUB_TOKEN or not GITHUB_OWNER or not GITHUB_REPO:
+        logger.error("GitHub configuration missing")
+        return None
+    
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Check if release exists for this version
+            tag_name = f"v{version}"
+            release_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tags/{tag_name}"
+            
+            async with session.get(release_url, headers=headers) as resp:
+                if resp.status == 200:
+                    release_data = await resp.json()
+                    release_id = release_data["id"]
+                    logger.info(f"Found existing release: {tag_name}")
+                    
+                    # Delete existing asset if present
+                    for asset in release_data.get("assets", []):
+                        if asset["name"] == "soundcloud.ipa":
+                            delete_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/assets/{asset['id']}"
+                            async with session.delete(delete_url, headers=headers) as del_resp:
+                                if del_resp.status == 204:
+                                    logger.info("Deleted old IPA asset")
+                else:
+                    # Create new release
+                    create_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
+                    release_payload = {
+                        "tag_name": tag_name,
+                        "name": f"SoundCloud {version}",
+                        "body": changelog,
+                        "draft": False,
+                        "prerelease": False,
+                    }
+                    async with session.post(create_url, headers=headers, json=release_payload) as create_resp:
+                        if create_resp.status == 201:
+                            release_data = await create_resp.json()
+                            release_id = release_data["id"]
+                            logger.info(f"Created new release: {tag_name}")
+                        else:
+                            error = await create_resp.text()
+                            logger.error(f"Failed to create release: {error}")
+                            return None
+            
+            # Upload the IPA as an asset
+            upload_url = f"https://uploads.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/{release_id}/assets?name=soundcloud.ipa"
+            upload_headers = {
+                **headers,
+                "Content-Type": "application/octet-stream",
+            }
+            
+            # Read file and upload
+            async with aiofiles.open(file_path, "rb") as f:
+                file_data = await f.read()
+            
+            async with session.post(upload_url, headers=upload_headers, data=file_data) as upload_resp:
+                if upload_resp.status == 201:
+                    asset_data = await upload_resp.json()
+                    download_url = asset_data["browser_download_url"]
+                    logger.info(f"Uploaded IPA to GitHub: {download_url}")
+                    return download_url
+                else:
+                    error = await upload_resp.text()
+                    logger.error(f"Failed to upload asset: {error}")
+                    return None
+                    
+    except Exception as e:
+        logger.error(f"GitHub upload error: {e}")
+        return None
+
+
+async def push_file_to_github(file_path: Path, repo_path: str, commit_message: str) -> bool:
+    """Push a file to GitHub repository."""
+    if not GITHUB_TOKEN or not GITHUB_OWNER or not GITHUB_REPO:
+        logger.error("GitHub configuration missing")
+        return False
+    
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Get current file SHA (if exists)
+            file_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/contents/{repo_path}"
+            sha = None
+            
+            async with session.get(file_url, headers=headers) as resp:
+                if resp.status == 200:
+                    file_data = await resp.json()
+                    sha = file_data.get("sha")
+            
+            # Read file content
+            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+                content = await f.read()
+            
+            import base64
+            encoded_content = base64.b64encode(content.encode()).decode()
+            
+            # Update/create file
+            payload = {
+                "message": commit_message,
+                "content": encoded_content,
+            }
+            if sha:
+                payload["sha"] = sha
+            
+            async with session.put(file_url, headers=headers, json=payload) as resp:
+                if resp.status in [200, 201]:
+                    logger.info(f"Pushed {repo_path} to GitHub")
+                    return True
+                else:
+                    error = await resp.text()
+                    logger.error(f"Failed to push file: {error}")
+                    return False
+                    
+    except Exception as e:
+        logger.error(f"GitHub push error: {e}")
+        return False
+
+
+def get_github_download_url(version: str) -> str:
+    """Get the GitHub Releases download URL for an IPA."""
+    return f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/v{version}/soundcloud.ipa"
 
 
 def copy_backup_sync(src: Path, dst: Path) -> bool:
@@ -654,6 +799,25 @@ async def callback_confirm(callback: CallbackQuery, telethon_client: TelegramCli
         history = await load_version_history()
         now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
+        # Upload to GitHub Releases
+        await bot.edit_message_text(
+            text="📤 **Uploading to GitHub Releases...**",
+            chat_id=callback.message.chat.id,
+            message_id=progress_msg.message_id,
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        
+        github_download_url = await upload_to_github_release(MAIN_IPA_PATH, version, changelog)
+        
+        if github_download_url:
+            download_url = github_download_url
+            logger.info(f"Using GitHub URL: {download_url}")
+        else:
+            # Fallback to local URL if GitHub upload fails
+            repo_url = get_repository_url()
+            download_url = f"{repo_url}/soundcloud.ipa"
+            logger.warning("GitHub upload failed, using local URL")
+
         # Update version history
         new_version_entry = {
             "version": version,
@@ -661,6 +825,7 @@ async def callback_confirm(callback: CallbackQuery, telethon_client: TelegramCli
             "size": actual_size,
             "filename": backup_filename,
             "changelog": changelog,
+            "download_url": download_url,
         }
 
         # Check if version already exists, update if so
@@ -684,7 +849,6 @@ async def callback_confirm(callback: CallbackQuery, telethon_client: TelegramCli
         await save_version_history(history)
 
         # Update source.json for ESign/Feather
-        repo_url = get_repository_url()
         source = {
             "apps": [
                 {
@@ -692,7 +856,7 @@ async def callback_confirm(callback: CallbackQuery, telethon_client: TelegramCli
                     "bundleIdentifier": "com.soundcloud.TouchApp",
                     "version": version,
                     "versionDate": now,
-                    "downloadURL": f"{repo_url}/soundcloud.ipa",
+                    "downloadURL": download_url,
                     "size": actual_size,
                     "category": "Music",
                 }
@@ -700,15 +864,45 @@ async def callback_confirm(callback: CallbackQuery, telethon_client: TelegramCli
         }
         await save_source_json(source)
 
+        # Push source.json to GitHub (triggers Vercel redeploy)
+        github_pushed = False
+        if GITHUB_TOKEN:
+            await bot.edit_message_text(
+                text="🔄 **Pushing to GitHub...**",
+                chat_id=callback.message.chat.id,
+                message_id=progress_msg.message_id,
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            github_pushed = await push_file_to_github(
+                SOURCE_JSON_PATH,
+                "esign/source.json",
+                f"Update source.json for v{version}"
+            )
+            if github_pushed:
+                logger.info("Pushed source.json to GitHub - Vercel will auto-deploy")
+
         # Success message
-        success_text = (
-            "✅ **Upload Complete!**\n\n"
-            f"📱 **Version:** `{version}`\n"
-            f"💾 **Size:** {format_size(actual_size)}\n"
-            f"📝 **Changelog:** _{changelog}_\n\n"
-            f"**Download URL:**\n`{repo_url}/soundcloud.ipa`\n\n"
-            f"**Repository Feed:**\n`{repo_url}/source.json`"
-        )
+        if github_download_url and github_pushed:
+            success_text = (
+                "✅ **Upload Complete!**\n\n"
+                f"📱 **Version:** `{version}`\n"
+                f"💾 **Size:** {format_size(actual_size)}\n"
+                f"📝 **Changelog:** _{changelog}_\n\n"
+                "🌐 **Status:** Uploaded to GitHub ✅\n"
+                "🚀 **Vercel:** Auto-deploying... ✅\n\n"
+                f"**Download URL:**\n`{download_url}`\n\n"
+                f"**Repository:**\nhttps://esign-olive.vercel.app"
+            )
+        else:
+            repo_url = get_repository_url()
+            success_text = (
+                "✅ **Upload Complete!**\n\n"
+                f"📱 **Version:** `{version}`\n"
+                f"💾 **Size:** {format_size(actual_size)}\n"
+                f"📝 **Changelog:** _{changelog}_\n\n"
+                f"**Download URL:**\n`{download_url}`\n\n"
+                f"**Repository Feed:**\n`{repo_url}/source.json`"
+            )
 
         await bot.edit_message_text(
             text=success_text,
