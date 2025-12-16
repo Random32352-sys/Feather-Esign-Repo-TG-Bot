@@ -558,19 +558,46 @@
             }
         });
 
+        // #region agent log - H1, H2, H3
         // Set URLs - Use unencoded URL (works better with iOS custom schemes)
         const sourceUrl = 'https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/source.json';
-        document.getElementById('esign-btn').href = 'esign://addsource?url=' + sourceUrl;
-        document.getElementById('feather-btn').href = 'feather://source/add?url=' + sourceUrl;
+        const esignUrl = 'esign://addsource?url=' + sourceUrl;
+        const featherUrl = 'feather://source/add?url=' + sourceUrl;
         
+        document.getElementById('esign-btn').href = esignUrl;
+        document.getElementById('feather-btn').href = featherUrl;
+        
+        console.log('=== DEBUG ===');
         console.log('Source URL:', sourceUrl);
+        console.log('ESign URL:', esignUrl);
+        console.log('Feather URL:', featherUrl);
+        
+        // Test if source.json is accessible
+        fetch(sourceUrl)
+            .then(r => {
+                console.log('Fetch status:', r.status, r.statusText);
+                console.log('Content-Type:', r.headers.get('content-type'));
+                return r.text();
+            })
+            .then(text => {
+                console.log('Source JSON content:', text.substring(0, 200));
+                try {
+                    const parsed = JSON.parse(text);
+                    console.log('JSON valid:', true);
+                    console.log('Apps count:', parsed.apps?.length);
+                } catch(e) {
+                    console.log('JSON parse error:', e.message);
+                }
+            })
+            .catch(e => console.log('Fetch error:', e.message));
+        // #endregion
 
         // Load version
         fetch('source.json')
             .then(r => r.json())
             .then(data => {
                 if (data.apps?.[0]) {
-                    document.getElementById('version').textContent = 'Version ' + data.apps[0].version;
+                    document.getElementById('version').textContent = 'Version ' + (data.apps[0].version || 'No versions');
                 }
             })
             .catch(() => { });
