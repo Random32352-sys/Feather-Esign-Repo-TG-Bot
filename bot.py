@@ -53,7 +53,7 @@ GITHUB_REPO = os.getenv("GITHUB_REPO", "")
 
 # Vercel URL (public repository URL)
 # Using GitHub Pages for hosting (more reliable than Vercel for static files)
-VERCEL_URL = os.getenv("VERCEL_URL", "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign")
+VERCEL_URL = os.getenv("VERCEL_URL", "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot")
 
 # Project paths
 PROJECT_PATH = Path(__file__).parent
