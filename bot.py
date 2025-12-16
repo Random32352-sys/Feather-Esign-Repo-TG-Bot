@@ -51,6 +51,9 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 GITHUB_OWNER = os.getenv("GITHUB_OWNER", "")
 GITHUB_REPO = os.getenv("GITHUB_REPO", "")
 
+# Vercel URL (public repository URL)
+VERCEL_URL = os.getenv("VERCEL_URL", "https://esign-olive.vercel.app")
+
 # ESign paths (configurable via ESIGN_PATH env var)
 DEFAULT_ESIGN_PATH = r"C:\inetpub\wwwroot\esign"
 ESIGN_BASE_PATH = Path(os.getenv("ESIGN_PATH", DEFAULT_ESIGN_PATH))
@@ -557,12 +560,12 @@ async def cmd_start(message: Message) -> None:
         "**How to use:**\n"
         "1️⃣ Forward an IPA file to this bot\n"
         "2️⃣ Review and confirm the upload\n"
-        "3️⃣ Bot downloads and stores the file\n\n"
+        "3️⃣ Bot uploads to GitHub & updates Vercel\n\n"
         "**Commands:**\n"
         "• `/start` - Show this help\n"
         "• `/repoinfo` - Repository status\n"
         "• `/setchangelog [text]` - Set changelog\n\n"
-        f"**Repository URL:**\n`{get_repository_url()}/source.json`"
+        f"**Repository URL:**\n`{VERCEL_URL}`"
     )
     await message.answer(help_text, parse_mode=ParseMode.MARKDOWN)
 
@@ -574,26 +577,27 @@ async def cmd_repoinfo(message: Message) -> None:
         return
 
     history = await load_version_history()
-    current_version = history.get("current_version", "None")
+    current_version = history.get("current_version", "")
     versions = history.get("versions", [])
     backup_count = len(versions)
-
-    ip = get_local_ip()
-    repo_url = get_repository_url()
 
     # Check if main IPA exists
     ipa_exists = "✅" if MAIN_IPA_PATH.exists() else "❌"
     ipa_size = format_size(MAIN_IPA_PATH.stat().st_size) if MAIN_IPA_PATH.exists() else "N/A"
 
+    # Get GitHub download URL if available
+    if current_version and GITHUB_OWNER and GITHUB_REPO:
+        download_url = get_github_download_url(current_version)
+    else:
+        download_url = "No version uploaded yet"
+
     text = (
         "📦 **Repository Status**\n\n"
-        f"🌐 **Local IP:** `{ip}`\n"
-        f"🔌 **Port:** `{ESIGN_PORT}`\n\n"
-        f"📱 **Current Version:** `{current_version}`\n"
-        f"💾 **File Status:** {ipa_exists} ({ipa_size})\n"
+        f"📱 **Current Version:** `{current_version or 'None'}`\n"
+        f"💾 **Local File:** {ipa_exists} ({ipa_size})\n"
         f"📚 **Backups:** {backup_count} versions\n\n"
-        f"**Repository URL:**\n`{repo_url}/source.json`\n\n"
-        f"**Direct Download:**\n`{repo_url}/soundcloud.ipa`"
+        f"🌐 **Public Repository:**\n`{VERCEL_URL}`\n\n"
+        f"📥 **GitHub Downloads:**\n`{download_url}`"
     )
     await message.answer(text, parse_mode=ParseMode.MARKDOWN)
 
