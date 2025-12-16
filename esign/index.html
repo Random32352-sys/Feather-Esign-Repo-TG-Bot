@@ -558,42 +558,99 @@
             }
         });
 
-        // #region agent log - H1, H2, H3
-        // Set URLs - native browser behavior triggers iOS popup
+        // #region agent log - DETAILED DEBUG
         const sourceUrl = 'https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/source.json';
         const esignUrl = 'esign://addsource?url=' + sourceUrl;
         const featherUrl = 'feather://source/add?url=' + sourceUrl;
         
-        // Set href directly - let native browser handle custom URL schemes
+        // Set href directly
         document.getElementById('esign-btn').href = esignUrl;
         document.getElementById('feather-btn').href = featherUrl;
         
-        console.log('ESign URL set:', esignUrl);
-        console.log('Feather URL set:', featherUrl);
+        console.log('========================================');
+        console.log('🔧 DEBUG MODE - ESign Source Diagnostics');
+        console.log('========================================');
+        console.log('📍 Source URL:', sourceUrl);
+        console.log('📍 ESign URL:', esignUrl);
+        console.log('📍 Feather URL:', featherUrl);
+        console.log('');
         
-        console.log('=== DEBUG ===');
-        console.log('Source URL:', sourceUrl);
-        console.log('ESign URL:', esignUrl);
-        console.log('Feather URL:', featherUrl);
-        
-        // Test if source.json is accessible
+        // Fetch and validate source.json
+        console.log('🔄 Fetching source.json...');
         fetch(sourceUrl)
             .then(r => {
-                console.log('Fetch status:', r.status, r.statusText);
-                console.log('Content-Type:', r.headers.get('content-type'));
+                console.log('📥 Response Status:', r.status, r.statusText);
+                console.log('📥 Content-Type:', r.headers.get('content-type'));
+                console.log('📥 Content-Length:', r.headers.get('content-length'));
+                if (!r.ok) {
+                    console.error('❌ HTTP Error:', r.status);
+                }
                 return r.text();
             })
             .then(text => {
-                console.log('Source JSON content:', text.substring(0, 200));
+                console.log('');
+                console.log('📄 RAW JSON CONTENT:');
+                console.log('----------------------------------------');
+                console.log(text);
+                console.log('----------------------------------------');
+                console.log('');
+                
                 try {
-                    const parsed = JSON.parse(text);
-                    console.log('JSON valid:', true);
-                    console.log('Apps count:', parsed.apps?.length);
+                    const data = JSON.parse(text);
+                    console.log('✅ JSON is VALID');
+                    console.log('');
+                    console.log('📊 SOURCE STRUCTURE:');
+                    console.log('  - name:', data.name);
+                    console.log('  - identifier:', data.identifier);
+                    console.log('  - iconURL:', data.iconURL);
+                    console.log('  - website:', data.website);
+                    console.log('  - apps count:', data.apps?.length || 0);
+                    console.log('  - news count:', data.news?.length || 0);
+                    console.log('');
+                    
+                    if (data.apps && data.apps.length > 0) {
+                        data.apps.forEach((app, i) => {
+                            console.log(`📱 APP ${i + 1}:`);
+                            console.log('  - name:', app.name);
+                            console.log('  - bundleIdentifier:', app.bundleIdentifier);
+                            console.log('  - developerName:', app.developerName);
+                            console.log('  - iconURL:', app.iconURL);
+                            console.log('  - subtitle:', app.subtitle);
+                            console.log('  - versions count:', app.versions?.length || 0);
+                            console.log('  - version (root):', app.version || '(not set)');
+                            console.log('  - downloadURL (root):', app.downloadURL || '(not set)');
+                            if (app.versions && app.versions.length > 0) {
+                                app.versions.forEach((v, j) => {
+                                    console.log(`    📦 Version ${j + 1}:`, v.version, '| size:', v.size, '| downloadURL:', v.downloadURL);
+                                });
+                            }
+                        });
+                    }
+                    console.log('');
+                    console.log('✅ Source validation complete');
                 } catch(e) {
-                    console.log('JSON parse error:', e.message);
+                    console.error('❌ JSON PARSE ERROR:', e.message);
+                    console.error('❌ This is why ESign rejects the source!');
                 }
             })
-            .catch(e => console.log('Fetch error:', e.message));
+            .catch(e => {
+                console.error('❌ FETCH ERROR:', e.message);
+                console.error('❌ Cannot reach source.json - this is why ESign fails!');
+            });
+        
+        // Button click logging
+        document.getElementById('esign-btn').addEventListener('click', function(e) {
+            console.log('');
+            console.log('🖱️ ESign button CLICKED');
+            console.log('🔗 Opening URL:', this.href);
+            // Don't prevent default - let native behavior work
+        });
+        
+        document.getElementById('feather-btn').addEventListener('click', function(e) {
+            console.log('');
+            console.log('🖱️ Feather button CLICKED');
+            console.log('🔗 Opening URL:', this.href);
+        });
         // #endregion
 
         // Load version
