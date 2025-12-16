@@ -1714,14 +1714,15 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
         source = {
             "name": "SoundCloud Repository",
             "identifier": "com.soundcloud.repo",
-            "iconURL": f"{VERCEL_URL}/soundcloud-logo.png",
+            "iconURL": f"{VERCEL_URL}/esign/soundcloud-logo.png",
             "website": f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}",
+            "sourceURL": f"{VERCEL_URL}/esign/source.json",
             "apps": [
                 {
                     "name": "SoundCloud",
                     "bundleIdentifier": "com.soundcloud.TouchApp",
                     "developerName": "Random32352",
-                    "iconURL": f"{VERCEL_URL}/soundcloud-logo.png",
+                    "iconURL": f"{VERCEL_URL}/esign/soundcloud-logo.png",
                     "localizedDescription": changelog,
                     "subtitle": "Modified SoundCloud",
                     "tintColor": "FF9500",
