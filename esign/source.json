@@ -1,21 +1,6 @@
 {
   "name": "SoundCloud Repository",
   "identifier": "com.soundcloud.repo",
-  "iconURL": "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/soundcloud-logo.png",
-  "website": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot",
-  "apps": [
-    {
-      "name": "SoundCloud",
-      "bundleIdentifier": "com.soundcloud.TouchApp",
-      "developerName": "Random32352",
-      "iconURL": "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/soundcloud-logo.png",
-      "localizedDescription": "SoundCloud with Go+ unlocked, HQ audio, and no ads.",
-      "subtitle": "Modified SoundCloud",
-      "tintColor": "FF9500",
-      "versions": [],
-      "appPermissions": {},
-      "screenshotURLs": []
-    }
-  ],
-  "news": []
+  "sourceURL": "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/source.json",
+  "apps": []
 }
