@@ -51,9 +51,9 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 GITHUB_OWNER = os.getenv("GITHUB_OWNER", "")
 GITHUB_REPO = os.getenv("GITHUB_REPO", "")
 
-# Vercel URL (public repository URL)
-# Using GitHub Pages for hosting (more reliable than Vercel for static files)
-VERCEL_URL = os.getenv("VERCEL_URL", "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot")
+# Repository URL (public repository URL)
+# Using GitHub Pages for hosting
+REPO_URL = os.getenv("REPO_URL", "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot")
 
 # Project paths
 PROJECT_PATH = Path(__file__).parent
@@ -692,7 +692,7 @@ async def cmd_start(message: Message) -> None:
         await message.answer("⛔ Access denied. This bot is private.")
         return
 
-    source_url = f"{VERCEL_URL}/source.json"
+    source_url = f"{REPO_URL}/esign/source.json"
     help_text = (
         "🚀 **ESign Repository Bot**\n\n"
         "Manage your IPA repository for ESign/Feather apps.\n\n"
@@ -703,7 +703,7 @@ async def cmd_start(message: Message) -> None:
         "• `/setchangelog [text]` - Set changelog\n"
         "• `/deleteversion` - Delete a version\n"
         "• `/syncgithub` - Force push source.json to GitHub\n\n"
-        f"**Repository URL:**\n`{VERCEL_URL}`\n\n"
+        f"**Repository URL:**\n`{REPO_URL}`\n\n"
         f"**ESign Source URL:**\n`{source_url}`"
     )
     await message.answer(help_text, parse_mode=ParseMode.MARKDOWN)
@@ -783,7 +783,7 @@ async def cmd_repoinfo(message: Message) -> None:
         f"📱 **Current Version:** `{current_version or 'None'}`\n"
         f"💾 **Local File:** {ipa_exists} ({ipa_size})\n"
         f"📚 **Backups:** {backup_count} versions\n\n"
-        f"🌐 **Public Repository:**\n`{VERCEL_URL}`\n\n"
+        f"🌐 **Public Repository:**\n`{REPO_URL}`\n\n"
         f"📥 **GitHub Downloads:**\n`{download_url}`"
     )
     await message.answer(text, parse_mode=ParseMode.MARKDOWN)
