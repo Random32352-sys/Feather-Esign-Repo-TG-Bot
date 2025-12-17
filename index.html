@@ -121,7 +121,7 @@
         }
 
         .start-hint {
-            color: rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.5);
             font-size: 12px;
             margin-bottom: 20px;
             letter-spacing: 3px;
@@ -208,11 +208,7 @@
             color: #fff;
         }
 
-        .version {
-            color: rgba(255, 255, 255, 0.3);
-            font-size: 14px;
-            margin-bottom: 40px;
-        }
+
 
         .buttons {
             display: flex;
@@ -246,7 +242,7 @@
 
         .footer {
             margin-top: 50px;
-            color: rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.45);
             font-size: 11px;
             letter-spacing: 2px;
             text-transform: uppercase;
@@ -498,7 +494,6 @@
             <img src="esign/logo.png" alt="Logo" class="logo" id="logo">
         </div>
         <h1>SoundCloud Repo</h1>
-        <p class="version" id="version">Add to your sideloading app</p>
 
         <div class="buttons">
             <a href="#" class="btn btn-primary" id="esign-btn">Add to ESign</a>
@@ -641,15 +636,6 @@
         });
         // #endregion
 
-        // Load version
-        fetch('esign/source.json')
-            .then(r => r.json())
-            .then(data => {
-                if (data.apps?.[0]) {
-                    document.getElementById('version').textContent = 'Version ' + (data.apps[0].version || 'No versions');
-                }
-            })
-            .catch(() => { });
     </script>
 </body>
 
