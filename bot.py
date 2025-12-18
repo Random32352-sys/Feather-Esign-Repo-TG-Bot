@@ -111,6 +111,10 @@ class ChangelogStates(StatesGroup):
     waiting_for_changelog = State()
 
 
+class DescriptionStates(StatesGroup):
+    waiting_for_description = State()
+
+
 class DeleteVersionStates(StatesGroup):
     waiting_for_confirmation = State()
 
@@ -677,6 +681,7 @@ def build_confirmation_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(text="📝 Edit Changelog", callback_data="edit_changelog"),
+                InlineKeyboardButton(text="📋 Edit Description", callback_data="edit_description"),
             ],
         ]
     )
@@ -1381,6 +1386,54 @@ async def handle_changelog_input(message: Message, state: FSMContext) -> None:
         )
     else:
         await message.answer("❌ Failed to save changelog.")
+
+    await state.clear()
+
+
+@router.callback_query(F.data == "edit_description")
+async def callback_edit_description(callback: CallbackQuery, state: FSMContext) -> None:
+    """Start description editing during upload."""
+    if not is_owner(callback.from_user.id):
+        return
+
+    # Get current description
+    source = await load_source_json()
+    current_desc = ""
+    if source.get("apps") and len(source["apps"]) > 0:
+        current_desc = source["apps"][0].get("localizedDescription", "")
+
+    await state.set_state(DescriptionStates.waiting_for_description)
+    await callback.message.answer(
+        f"📋 **Edit App Description**\n\n"
+        f"**Current:** _{current_desc or 'Not set'}_\n\n"
+        "Send me the new app description:",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    await callback.answer()
+
+
+@router.message(StateFilter(DescriptionStates.waiting_for_description))
+async def handle_description_input(message: Message, state: FSMContext) -> None:
+    """Handle description text input during upload."""
+    if not is_owner(message.from_user.id):
+        return
+
+    new_description = message.text.strip()
+    
+    # Update source.json with new description
+    source = await load_source_json()
+    if source.get("apps") and len(source["apps"]) > 0:
+        source["apps"][0]["localizedDescription"] = new_description
+        if await save_source_json(source):
+            await message.answer(
+                f"✅ Description updated:\n\n_{new_description}_\n\n"
+                "Now click **Confirm Upload** to proceed.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        else:
+            await message.answer("❌ Failed to save description.")
+    else:
+        await message.answer("❌ No app found in source.json.")
 
     await state.clear()
 
