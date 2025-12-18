@@ -1396,7 +1396,7 @@ async def callback_confirm_delete_version(callback: CallbackQuery, state: FSMCon
                     try:
                         github_pushed = await push_file_to_github(
                             SOURCE_JSON_PATH,
-                            "esign/source.json",
+                            "repo/esign/source.json",
                             f"Remove version {version_to_delete} from repository"
                         )
                     except Exception as e:
@@ -1828,27 +1828,37 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
 
         # Update source.json for ESign/Feather (correct Feather format with duplicate fields)
         now_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+        
+        # Load existing source.json to preserve the description
+        existing_source = await load_source_json()
+        existing_description = ""
+        if existing_source.get("apps") and len(existing_source["apps"]) > 0:
+            existing_description = existing_source["apps"][0].get("localizedDescription", "")
+        if not existing_description:
+            existing_description = changelog  # Fallback to changelog if no description set
+        
         source = {
-            "name": "SoundCloud Repository",
-            "identifier": "com.soundcloud.repo",
-            "iconURL": f"{VERCEL_URL}/esign/soundcloud-logo.png",
-            "website": f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}",
-            "sourceURL": f"{VERCEL_URL}/esign/source.json",
+            "name": "woomc repo",
+            "identifier": "xyz.woomc.repo",
+            "iconURL": f"{REPO_URL}/esign/logo.png",
+            "website": REPO_URL,
+            "sourceURL": f"{REPO_URL}/esign/source.json",
             "apps": [
                 {
                     "name": "SoundCloud",
                     "bundleIdentifier": "com.soundcloud.TouchApp",
-                    "developerName": "Random32352",
-                    "iconURL": f"{VERCEL_URL}/esign/soundcloud-logo.png",
-                    "localizedDescription": changelog,
-                    "subtitle": "Modified SoundCloud",
-                    "tintColor": "FF9500",
+                    "developerName": "woomc",
+                    "iconURL": f"{REPO_URL}/esign/logo.png",
+                    "localizedDescription": existing_description,
+                    "subtitle": "Tweaked SoundCloud",
+                    "tintColor": "FF5500",
                     "versions": [
                         {
                             "version": version,
                             "date": now_iso,
                             "size": actual_size,
                             "downloadURL": download_url,
+                            "localizedDescription": changelog,
                         }
                     ],
                     "appPermissions": {},
@@ -1878,7 +1888,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
             )
             github_pushed = await push_file_to_github(
                 SOURCE_JSON_PATH,
-                "esign/source.json",
+                "repo/esign/source.json",
                 f"Update source.json for v{version}"
             )
             # #region agent log
@@ -1895,9 +1905,9 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                 f"💾 **Size:** {format_size(actual_size)}\n"
                 f"📝 **Changelog:** _{changelog}_\n\n"
                 "🌐 **Status:** Uploaded to GitHub ✅\n"
-                "🚀 **Vercel:** Auto-deploying... ✅\n\n"
+                "🚀 **GitHub Pages:** Auto-deploying... ✅\n\n"
                 f"**Download URL:**\n`{download_url}`\n\n"
-                f"**Repository:**\nhttps://esign-olive.vercel.app"
+                f"**Repository:**\n{REPO_URL}"
             )
         else:
             repo_url = get_repository_url()
