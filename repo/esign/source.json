@@ -13,13 +13,21 @@
       "localizedDescription": "Updated to version 8.42.3",
       "subtitle": "Tweaked SoundCloud",
       "tintColor": "FF5500",
-      "versions": [],
+      "versions": [
+        {
+          "version": "8.42.3",
+          "date": "2025-12-18T21:36:11Z",
+          "size": 103441891,
+          "downloadURL": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot/releases/download/v8.42.3/soundcloud.ipa",
+          "localizedDescription": "Updated to the latest version"
+        }
+      ],
       "appPermissions": {},
       "screenshotURLs": [],
-      "version": "",
-      "versionDate": "",
-      "size": 0,
-      "downloadURL": ""
+      "version": "8.42.3",
+      "versionDate": "2025-12-18T21:36:11Z",
+      "size": 103441891,
+      "downloadURL": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot/releases/download/v8.42.3/soundcloud.ipa"
     }
   ],
   "news": []
