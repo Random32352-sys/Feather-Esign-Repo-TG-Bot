@@ -829,7 +829,7 @@ async def cmd_syncgithub(message: Message) -> None:
         
         success = await push_file_to_github(
             SOURCE_JSON_PATH,
-            "esign/source.json",
+            "repo/esign/source.json",
             "Force sync source.json"
         )
         
