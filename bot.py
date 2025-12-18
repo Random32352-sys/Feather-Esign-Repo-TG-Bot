@@ -759,33 +759,98 @@ async def cmd_stop(message: Message, state: FSMContext) -> None:
 
 @router.message(Command("repoinfo"))
 async def cmd_repoinfo(message: Message) -> None:
-    """Display repository status."""
+    """Display comprehensive repository status with sync check."""
     if not is_owner(message.from_user.id):
         return
 
+    await message.answer("🔍 **Checking repository status...**", parse_mode=ParseMode.MARKDOWN)
+
+    # Load all data sources
     history = await load_version_history()
-    current_version = history.get("current_version", "")
-    versions = history.get("versions", [])
-    backup_count = len(versions)
-
-    # Check if main IPA exists
-    ipa_exists = "✅" if MAIN_IPA_PATH.exists() else "❌"
-    ipa_size = format_size(MAIN_IPA_PATH.stat().st_size) if MAIN_IPA_PATH.exists() else "N/A"
-
-    # Get GitHub download URL if available
-    if current_version and GITHUB_OWNER and GITHUB_REPO:
-        download_url = get_github_download_url(current_version)
-    else:
-        download_url = "No version uploaded yet"
-
-    text = (
-        "📦 **Repository Status**\n\n"
-        f"📱 **Current Version:** `{current_version or 'None'}`\n"
-        f"💾 **Local File:** {ipa_exists} ({ipa_size})\n"
-        f"📚 **Backups:** {backup_count} versions\n\n"
-        f"🌐 **Public Repository:**\n`{REPO_URL}`\n\n"
-        f"📥 **GitHub Downloads:**\n`{download_url}`"
-    )
+    source = await load_source_json()
+    
+    # Get versions from each source
+    history_version = history.get("current_version", "")
+    history_versions = history.get("versions", [])
+    
+    # Get version from source.json (what ESign/Feather sees)
+    source_apps = source.get("apps", [])
+    source_version = ""
+    source_download_url = ""
+    if source_apps:
+        # Find the SoundCloud app (or first app with versions)
+        for app in source_apps:
+            if app.get("versions"):
+                source_version = app["versions"][0].get("version", "")
+                source_download_url = app["versions"][0].get("downloadURL", "")
+                break
+    
+    # Check local IPA
+    ipa_exists = MAIN_IPA_PATH.exists()
+    ipa_size = format_size(MAIN_IPA_PATH.stat().st_size) if ipa_exists else "N/A"
+    
+    # Check GitHub Release exists
+    github_release_exists = False
+    github_version = ""
+    if GITHUB_TOKEN and GITHUB_OWNER and GITHUB_REPO and history_version:
+        try:
+            headers = {
+                "Authorization": f"token {GITHUB_TOKEN}",
+                "Accept": "application/vnd.github.v3+json",
+            }
+            async with aiohttp.ClientSession() as session:
+                tag_name = f"v{history_version}"
+                url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tags/{tag_name}"
+                async with session.get(url, headers=headers) as resp:
+                    if resp.status == 200:
+                        github_release_exists = True
+                        github_version = history_version
+        except Exception:
+            pass
+    
+    # Determine sync status
+    all_synced = True
+    sync_issues = []
+    
+    if history_version and source_version and history_version != source_version:
+        all_synced = False
+        sync_issues.append(f"• version\\_history: `{history_version}` ≠ source.json: `{source_version}`")
+    
+    if history_version and not github_release_exists:
+        all_synced = False
+        sync_issues.append(f"• GitHub Release `v{history_version}` not found")
+    
+    if history_version and not ipa_exists:
+        sync_issues.append("• Local IPA file missing")
+    
+    # Build status
+    sync_status = "✅ **All synced**" if all_synced and history_version else "⚠️ **Out of sync**" if sync_issues else "ℹ️ **No version uploaded yet**"
+    
+    # Build output
+    text = "📦 **Repository Status**\n\n"
+    
+    # Version info section
+    text += "**📱 Versions:**\n"
+    text += f"• History: `{history_version or 'None'}`\n"
+    text += f"• source.json: `{source_version or 'None'}`\n"
+    text += f"• GitHub Release: {'✅' if github_release_exists else '❌'} `{github_version or 'None'}`\n\n"
+    
+    # Local files section
+    text += "**💾 Local Files:**\n"
+    text += f"• Main IPA: {'✅' if ipa_exists else '❌'} ({ipa_size})\n"
+    text += f"• Backups: {len(history_versions)} versions\n\n"
+    
+    # Sync status section
+    text += f"**🔄 Sync Status:** {sync_status}\n"
+    if sync_issues:
+        text += "\n".join(sync_issues) + "\n"
+    text += "\n"
+    
+    # URLs section
+    text += f"**🌐 Repository:** `{REPO_URL}`\n"
+    if history_version:
+        text += f"**📥 Download:** `{get_github_download_url(history_version)}`"
+    
     await message.answer(text, parse_mode=ParseMode.MARKDOWN)
 
 
