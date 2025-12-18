@@ -1,15 +1,15 @@
 {
   "name": "SoundCloud Repository",
   "identifier": "com.soundcloud.repo",
-  "iconURL": "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/soundcloud-logo.png",
-  "website": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot",
-  "sourceURL": "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/source.json",
+  "iconURL": "https://woomc.xyz/repo/esign/logo.png",
+  "website": "https://woomc.xyz/repo",
+  "sourceURL": "https://woomc.xyz/repo/esign/source.json",
   "apps": [
     {
       "name": "Coming Soon",
       "bundleIdentifier": "com.placeholder.app",
       "developerName": "Random32352",
-      "iconURL": "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/soundcloud-logo.png",
+      "iconURL": "https://woomc.xyz/repo/esign/logo.png",
       "localizedDescription": "More apps will be added here soon!",
       "subtitle": "Stay tuned",
       "tintColor": "808080",
@@ -18,7 +18,7 @@
           "version": "1.0",
           "date": "2025-12-16T19:30:00Z",
           "size": 0,
-          "downloadURL": "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/source.json"
+          "downloadURL": "https://woomc.xyz/repo/esign/source.json"
         }
       ],
       "appPermissions": {},
@@ -26,7 +26,7 @@
       "version": "1.0",
       "versionDate": "2025-12-16T19:30:00Z",
       "size": 0,
-      "downloadURL": "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot/esign/source.json"
+      "downloadURL": "https://woomc.xyz/repo/esign/source.json"
     }
   ],
   "news": []

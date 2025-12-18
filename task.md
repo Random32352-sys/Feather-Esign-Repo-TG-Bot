@@ -20,22 +20,8 @@
 
 ## Next Steps 🚀
 
-- [ ] Purchase domain `woomc.xyz` from Spaceship
-    - Free WHOIS privacy included
-
-- [ ] Configure custom domain
-    - [ ] Rename `esign` folder to `repo`
-    - [ ] Update `bot.py` references (`/esign/` → `/repo/`)
-    - [ ] Update `index.html` references
-    - [ ] Update `source.json` references
-    - [ ] Create `CNAME` file with `woomc.xyz`
-    - [ ] Configure DNS at Spaceship (point to GitHub Pages)
-
-- [ ] Update page content
-    - [ ] Change title from "SoundCloud Repo" to new branding
-    - [ ] Update meta tags and descriptions
-
-- [ ] Test Telegram bot functionality
-    - [ ] Test `/send` command
-    - [ ] Test `/deleteversion` command
-    - [ ] Verify GitHub Release integration
+1.  [ ] **Step 1**: Rename GitHub Repo to `repo`
+2.  [ ] **Step 2**: Configure DNS in Spaceship
+3.  [ ] **Step 3**: Update branding & URLs in code
+4.  [x] Push changes to GitHub (Logo fix, UI improvements)
+5.  [ ] Test Telegram bot functionality

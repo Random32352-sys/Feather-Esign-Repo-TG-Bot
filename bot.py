@@ -53,12 +53,12 @@ GITHUB_REPO = os.getenv("GITHUB_REPO", "")
 
 # Repository URL (public repository URL)
 # Using GitHub Pages for hosting
-REPO_URL = os.getenv("REPO_URL", "https://random32352-sys.github.io/Feather-Esign-Repo-TG-Bot")
+REPO_URL = os.getenv("REPO_URL", "https://woomc.xyz/repo")
 
 # Project paths
 PROJECT_PATH = Path(__file__).parent
 IPA_PATH = PROJECT_PATH / "IPA"
-ESIGN_PATH = PROJECT_PATH / "esign"
+ESIGN_PATH = PROJECT_PATH / "repo" / "esign"
 VERSIONS_PATH = IPA_PATH / "versions"
 MAIN_IPA_PATH = IPA_PATH / "soundcloud.ipa"
 SOURCE_JSON_PATH = ESIGN_PATH / "source.json"
