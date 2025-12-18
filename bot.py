@@ -761,6 +761,7 @@ async def cmd_start(message: Message) -> None:
         "• /setchangelog - Set changelog\n"
         "• /setdescription - Set app description\n"
         "• /deleteversion - Delete a version\n"
+        "• /cleanreleases - Clean orphaned GitHub releases\n"
         "• /syncgithub - Force push source.json to GitHub\n\n"
         f"**Repository URL:**\n`{REPO_URL}`\n\n"
         f"**ESign Source URL:**\n`{source_url}`"
@@ -1021,6 +1022,123 @@ async def cmd_syncgithub(message: Message) -> None:
             )
     except Exception as e:
         await message.answer(f"❌ **Error:** `{str(e)}`", parse_mode=ParseMode.MARKDOWN)
+
+
+@router.message(Command("cleanreleases"))
+async def cmd_cleanreleases(message: Message) -> None:
+    """Find and delete orphaned GitHub Releases not in source.json."""
+    if not is_owner(message.from_user.id):
+        return
+
+    if not GITHUB_TOKEN or not GITHUB_OWNER or not GITHUB_REPO:
+        await message.answer("❌ GitHub not configured", parse_mode=ParseMode.MARKDOWN)
+        return
+
+    await message.answer("🔍 **Scanning GitHub Releases...**", parse_mode=ParseMode.MARKDOWN)
+
+    try:
+        # Get versions from source.json
+        source = await load_source_json()
+        source_versions = set()
+        if source.get("apps"):
+            for app in source["apps"]:
+                for version in app.get("versions", []):
+                    source_versions.add(version.get("version", ""))
+
+        # Get GitHub releases
+        headers = {
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json",
+        }
+        
+        orphaned_releases = []
+        
+        async with aiohttp.ClientSession() as session:
+            url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
+            async with session.get(url, headers=headers) as resp:
+                if resp.status == 200:
+                    releases = await resp.json()
+                    for release in releases:
+                        tag = release.get("tag_name", "")
+                        # Remove 'v' prefix to match version
+                        version = tag.lstrip("v")
+                        if version and version not in source_versions:
+                            orphaned_releases.append({
+                                "tag": tag,
+                                "version": version,
+                                "name": release.get("name", ""),
+                                "id": release.get("id"),
+                            })
+
+        if not orphaned_releases:
+            await message.answer(
+                "✅ **No orphaned releases found!**\n\n"
+                "All GitHub Releases are properly tracked in source.json.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
+
+        # Build keyboard for orphaned releases
+        buttons = []
+        for release in orphaned_releases:
+            buttons.append([
+                InlineKeyboardButton(
+                    text=f"🗑️ Delete {release['name']} ({release['tag']})",
+                    callback_data=f"clean_release:{release['tag']}"
+                )
+            ])
+        buttons.append([InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_clean")])
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+
+        await message.answer(
+            f"⚠️ **Found {len(orphaned_releases)} Orphaned Release(s)**\n\n"
+            "These releases exist on GitHub but are NOT in source.json:\n\n"
+            + "\n".join([f"• `{r['tag']}` - {r['name']}" for r in orphaned_releases]) +
+            "\n\nSelect a release to delete:",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=keyboard,
+        )
+
+    except Exception as e:
+        await message.answer(f"❌ **Error:** `{str(e)}`", parse_mode=ParseMode.MARKDOWN)
+
+
+@router.callback_query(F.data.startswith("clean_release:"))
+async def callback_clean_release(callback: CallbackQuery) -> None:
+    """Delete an orphaned GitHub Release."""
+    if not is_owner(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    tag = callback.data.split(":")[1]
+    version = tag.lstrip("v")
+    
+    await callback.answer("Deleting release...")
+    
+    success = await delete_github_release(version)
+    
+    if success:
+        await callback.message.edit_text(
+            f"✅ **Deleted orphaned release!**\n\n"
+            f"🗑️ Release `{tag}` has been removed from GitHub.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    else:
+        await callback.message.edit_text(
+            f"❌ **Failed to delete release**\n\n"
+            f"Release `{tag}` could not be deleted. Check logs.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+
+@router.callback_query(F.data == "cancel_clean")
+async def callback_cancel_clean(callback: CallbackQuery) -> None:
+    """Cancel clean releases operation."""
+    if not is_owner(callback.from_user.id):
+        return
+    await callback.message.edit_text("❌ Cleanup cancelled.")
+    await callback.answer()
 
 
 @router.message(Command("deleteversion"))
@@ -2084,6 +2202,7 @@ async def main() -> None:
         BotCommand(command="setchangelog", description="Set changelog text"),
         BotCommand(command="setdescription", description="Set app description"),
         BotCommand(command="deleteversion", description="Delete a version"),
+        BotCommand(command="cleanreleases", description="Clean orphaned GitHub releases"),
         BotCommand(command="syncgithub", description="Force push source.json to GitHub"),
     ]
     await bot.set_my_commands(commands)
