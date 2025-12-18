@@ -701,6 +701,7 @@ async def cmd_start(message: Message) -> None:
         "• /stop - Cancel current operation\n"
         "• /repoinfo - Repository status\n"
         "• /setchangelog - Set changelog\n"
+        "• /setdescription - Set app description\n"
         "• /deleteversion - Delete a version\n"
         "• /syncgithub - Force push source.json to GitHub\n\n"
         f"**Repository URL:**\n`{REPO_URL}`\n\n"
@@ -877,6 +878,57 @@ async def cmd_setchangelog(message: Message) -> None:
         )
     else:
         await message.answer("❌ Failed to save changelog. Check permissions.")
+
+
+@router.message(Command("setdescription"))
+async def cmd_setdescription(message: Message) -> None:
+    """Set app description in source.json."""
+    if not is_owner(message.from_user.id):
+        return
+
+    # Extract text after command
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        await message.answer(
+            "📝 **Usage:** /setdescription Your app description here",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return
+
+    description_text = parts[1].strip()
+    
+    # Load source.json and update description
+    source = await load_source_json()
+    apps = source.get("apps", [])
+    
+    if not apps:
+        await message.answer("❌ No apps in source.json yet. Upload an IPA first.")
+        return
+    
+    # Update the first app's description
+    apps[0]["localizedDescription"] = description_text
+    
+    # Save and push to GitHub
+    if await save_source_json(source):
+        # Push to GitHub
+        push_success = await push_file_to_github(
+            SOURCE_JSON_PATH,
+            "repo/esign/source.json",
+            f"Update app description"
+        )
+        
+        if push_success:
+            await message.answer(
+                f"✅ **Description updated and pushed to GitHub!**\n\n_{description_text}_",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        else:
+            await message.answer(
+                f"✅ Description saved locally, but failed to push to GitHub.\n\n_{description_text}_",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+    else:
+        await message.answer("❌ Failed to save description. Check permissions.")
 
 
 @router.message(Command("syncgithub"))
@@ -1938,6 +1990,7 @@ async def main() -> None:
         BotCommand(command="stop", description="Cancel current operation"),
         BotCommand(command="repoinfo", description="Repository status"),
         BotCommand(command="setchangelog", description="Set changelog text"),
+        BotCommand(command="setdescription", description="Set app description"),
         BotCommand(command="deleteversion", description="Delete a version"),
         BotCommand(command="syncgithub", description="Force push source.json to GitHub"),
     ]
