@@ -651,7 +651,12 @@ def build_version_delete_keyboard(versions: list) -> InlineKeyboardMarkup:
                     button_text = f"{prefix} {display_name}"
                 elif is_github:
                     prefix = "🌐"
-                    button_text = f"{prefix} {version_str}"
+                    # Show app name if available, otherwise version
+                    app_name = version.get("app_name", "")
+                    if app_name:
+                        button_text = f"{prefix} {app_name} v{version_str}"
+                    else:
+                        button_text = f"{prefix} {version_str}"
                 else:
                     prefix = "🗑️"
                     button_text = f"{prefix} {version_str}"
@@ -1014,6 +1019,7 @@ async def cmd_deleteversion(message: Message) -> None:
     if source.get("apps"):
         tracked_versions = {v.get("version", "") for v in versions}
         for app in source["apps"]:
+            app_name = app.get("name", "Unknown App")
             if app.get("versions"):
                 for sv in app["versions"]:
                     sv_version = sv.get("version", "")
@@ -1021,6 +1027,7 @@ async def cmd_deleteversion(message: Message) -> None:
                         # This version is in source.json but not in version_history
                         source_versions.append({
                             "version": sv_version,
+                            "app_name": app_name,  # Include app name for display
                             "date": sv.get("date", "")[:10] if sv.get("date") else "",
                             "size": sv.get("size", 0),
                             "downloadURL": sv.get("downloadURL", ""),
