@@ -1,6 +1,15 @@
 {
   "app": "SoundCloud",
   "bundleIdentifier": "com.soundcloud.TouchApp",
-  "current_version": "",
-  "versions": []
+  "current_version": "8.42.3",
+  "versions": [
+    {
+      "version": "8.42.3",
+      "date": "2025-12-18T17:43:03",
+      "size": 103441891,
+      "filename": "soundcloud_8.42.3.ipa",
+      "changelog": "Updated to the latest version",
+      "download_url": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot/releases/download/v8.42.3/soundcloud.ipa"
+    }
+  ]
 }
