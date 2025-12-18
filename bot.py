@@ -1011,7 +1011,7 @@ async def cmd_syncgithub(message: Message) -> None:
         if success:
             await message.answer(
                 "✅ **Successfully pushed source.json to GitHub!**\n\n"
-                "Vercel should auto-redeploy in a few seconds.",
+                "GitHub Pages should update in a few seconds.",
                 parse_mode=ParseMode.MARKDOWN,
             )
         else:
@@ -1575,7 +1575,7 @@ async def callback_confirm_delete_version(callback: CallbackQuery, state: FSMCon
                             try:
                                 github_pushed = await push_file_to_github(
                                     SOURCE_JSON_PATH,
-                                    "esign/source.json",
+                                    "repo/esign/source.json",
                                     f"Remove untracked file {filename_to_delete} from repository"
                                 )
                                 # #region agent log
@@ -1701,17 +1701,17 @@ async def callback_confirm_delete_version(callback: CallbackQuery, state: FSMCon
             
             await save_source_json(source)
             
-            # Push updated source.json to GitHub (triggers Vercel redeploy)
+            # Push updated source.json to GitHub
             github_pushed = False
             if GITHUB_TOKEN:
                 try:
                     github_pushed = await push_file_to_github(
                         SOURCE_JSON_PATH,
-                        "esign/source.json",
+                        "repo/esign/source.json",
                         f"Remove version {version_to_delete} from repository"
                     )
                     if github_pushed:
-                        logger.info("Pushed updated source.json to GitHub - Vercel will auto-deploy")
+                        logger.info("Pushed updated source.json to GitHub")
                 except Exception as e:
                     logger.error(f"Failed to push source.json to GitHub: {e}")
             
@@ -1956,7 +1956,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
         }
         await save_source_json(source)
 
-        # Push source.json to GitHub (triggers Vercel redeploy)
+        # Push source.json to GitHub
         github_pushed = False
         if GITHUB_TOKEN:
             # #region agent log
@@ -1977,7 +1977,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
             log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "bot.py:1308", "message": "After pushing source.json to GitHub", "data": {"success": github_pushed}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
             # #endregion
             if github_pushed:
-                logger.info("Pushed source.json to GitHub - Vercel will auto-deploy")
+                logger.info("Pushed source.json to GitHub")
 
         # Success message
         if github_download_url and github_pushed:
