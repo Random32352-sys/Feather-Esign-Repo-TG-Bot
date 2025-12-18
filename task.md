@@ -28,3 +28,4 @@
     - [x] Fix Telethon download path (Saved Messages)
     - [x] Add Cancel (/stop) for active downloads
     - [x] Merge /cleanreleases into /deleteversion
+    - [x] Optimize Download Speed (FastTelethon + cryptg)

@@ -32,7 +32,8 @@ from aiogram.types import (
 )
 from dotenv import load_dotenv
 from telethon import TelegramClient
-from telethon.tl.types import DocumentAttributeFilename
+from fast_telethon import download_file as fast_download
+from telethon.tl.types import DocumentAttributeFilename, InputDocumentFileLocation
 
 # =============================================================================
 # CONFIGURATION
@@ -1982,11 +1983,30 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                             raise Exception("Download cancelled by user")
                         asyncio.create_task(tracker.update(current, total))
 
-                    await telethon_client.download_media(
-                        saved_msg,
-                        file=str(MAIN_IPA_PATH),
-                        progress_callback=progress_handler,
-                    )
+                    # Use fast parallel download
+                    if hasattr(saved_msg.media, 'document'):
+                        doc = saved_msg.media.document
+                        location = InputDocumentFileLocation(
+                            id=doc.id,
+                            access_hash=doc.access_hash,
+                            file_reference=doc.file_reference,
+                            thumb_size=""
+                        )
+                        
+                        logger.info(f"Using FastTelethon parallel download for {upload['filename']}")
+                        await fast_download(
+                            telethon_client,
+                            location,
+                            out=str(MAIN_IPA_PATH),
+                            progress_callback=progress_handler,
+                        )
+                    else:
+                        # Fallback for other media types (unlikely for IPA)
+                        await telethon_client.download_media(
+                            saved_msg,
+                            file=str(MAIN_IPA_PATH),
+                            progress_callback=progress_handler,
+                        )
                     logger.info("✅ Downloaded via Telethon from Saved Messages (fast)")
                     download_success = True
                 else:
