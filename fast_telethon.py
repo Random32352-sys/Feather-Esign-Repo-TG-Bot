@@ -33,13 +33,14 @@ async def download_file(
     client: TelegramClient,
     location: Union[InputDocumentFileLocation, InputPhotoFileLocation],
     out: Union[str, callable],
+    file_size: int,
     progress_callback: Optional[Callable] = None,
 ) -> Union[str, bytes]:
     """
     Download a file in parallel using multiple connections.
     """
-    size = location.size
-    dc_id = location.dc_id
+    size = file_size
+    # dc_id = location.dc_id # InputDocumentFileLocation doesn't have dc_id, but we don't strictly need it for GetFileRequest if client handles it
     
     # Calculate optimal part size and connection count
     # 1MB part size for files > 1GB

@@ -1998,6 +1998,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                             telethon_client,
                             location,
                             out=str(MAIN_IPA_PATH),
+                            file_size=doc.size,
                             progress_callback=progress_handler,
                         )
                     else:
