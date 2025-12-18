@@ -1970,35 +1970,33 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
 
         # Always try Telethon first (much faster), fallback to aiogram
         download_success = False
+        saved_msg_id = upload.get("saved_msg_id")
         
-        # Method 1: Try Telethon download from the message sent to bot
-        try:
-            logger.info("Attempting fast Telethon download...")
-            
-            # Get the message from our chat with the bot
-            chat_id = upload["chat_id"]
-            msg_id = upload["message_id"]
-            
-            # Get the message via Telethon
-            telethon_msg = await telethon_client.get_messages(chat_id, ids=msg_id)
-            
-            if telethon_msg and telethon_msg.media:
-                await telethon_client.download_media(
-                    telethon_msg,
-                    file=str(MAIN_IPA_PATH),
-                    progress_callback=lambda current, total: asyncio.create_task(
-                        tracker.update(current, total)
-                    ),
-                )
-                logger.info("✅ Downloaded via Telethon (fast)")
-                download_success = True
-            else:
-                logger.warning("Telethon could not access the message media")
+        # Method 1: Try Telethon download from Saved Messages (FASTEST - we have access)
+        if saved_msg_id and not download_success:
+            try:
+                logger.info(f"Downloading from Saved Messages via Telethon (msg_id={saved_msg_id})...")
                 
-        except Exception as telethon_err:
-            logger.warning(f"Telethon download failed: {telethon_err}, trying aiogram...")
+                # Get message from Saved Messages ('me')
+                saved_msg = await telethon_client.get_messages('me', ids=saved_msg_id)
+                
+                if saved_msg and saved_msg.media:
+                    await telethon_client.download_media(
+                        saved_msg,
+                        file=str(MAIN_IPA_PATH),
+                        progress_callback=lambda current, total: asyncio.create_task(
+                            tracker.update(current, total)
+                        ),
+                    )
+                    logger.info("✅ Downloaded via Telethon from Saved Messages (fast)")
+                    download_success = True
+                else:
+                    logger.warning("Could not get media from Saved Messages")
+                    
+            except Exception as telethon_err:
+                logger.warning(f"Telethon Saved Messages download failed: {telethon_err}")
         
-        # Method 2: Fallback to aiogram if Telethon failed
+        # Method 2: Fallback to aiogram if Telethon failed (only for small files <50MB)
         if not download_success:
             logger.info("Downloading via aiogram (slower fallback)...")
             
@@ -2016,10 +2014,12 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                         await tracker.update(downloaded, upload["size"])
                 
                 logger.info("Downloaded via aiogram")
+                download_success = True
                 
             except Exception as aiogram_err:
                 logger.error(f"Aiogram download failed: {aiogram_err}")
-                raise Exception(f"Download failed: {aiogram_err}")
+                if not download_success:
+                    raise Exception(f"Download failed. For files >50MB, forward from Saved Messages. Error: {aiogram_err}")
 
         # Verify file size
         if not MAIN_IPA_PATH.exists() or MAIN_IPA_PATH.stat().st_size == 0:
