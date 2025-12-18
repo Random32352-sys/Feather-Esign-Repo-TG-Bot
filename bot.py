@@ -240,6 +240,59 @@ async def save_source_json(source: dict) -> bool:
         return False
 
 
+def get_placeholder_source() -> dict:
+    """Get the placeholder source.json structure for when repo is empty."""
+    now_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    return {
+        "name": "woomc repo",
+        "identifier": "xyz.woomc.repo",
+        "iconURL": f"{REPO_URL}/esign/logo.png",
+        "website": REPO_URL,
+        "sourceURL": f"{REPO_URL}/esign/source.json",
+        "apps": [
+            {
+                "name": "Coming Soon",
+                "bundleIdentifier": "com.placeholder.app",
+                "developerName": "woomc",
+                "iconURL": f"{REPO_URL}/esign/logo.png",
+                "localizedDescription": "More apps will be added here soon!",
+                "subtitle": "Stay tuned",
+                "tintColor": "808080",
+                "versions": [
+                    {
+                        "version": "1.0",
+                        "date": now_iso,
+                        "size": 0,
+                        "downloadURL": f"{REPO_URL}/esign/source.json"
+                    }
+                ],
+                "appPermissions": {},
+                "screenshotURLs": [],
+                "version": "1.0",
+                "versionDate": now_iso,
+                "size": 0,
+                "downloadURL": f"{REPO_URL}/esign/source.json"
+            }
+        ],
+        "news": []
+    }
+
+
+def is_repo_empty(source: dict) -> bool:
+    """Check if the repository has no real apps (only placeholder or empty)."""
+    apps = source.get("apps", [])
+    if not apps:
+        return True
+    # Check if only placeholder exists
+    for app in apps:
+        bundle_id = app.get("bundleIdentifier", "")
+        if bundle_id != "com.placeholder.app":
+            # Has a real app with versions
+            if app.get("versions") and len(app.get("versions", [])) > 0:
+                return False
+    return True
+
+
 # =============================================================================
 # GITHUB API FUNCTIONS
 # =============================================================================
@@ -1397,14 +1450,25 @@ async def callback_confirm_delete_version(callback: CallbackQuery, state: FSMCon
             
             # Push updated source.json to GitHub
             github_pushed = False
+            placeholder_added = False
+            
             if updated_source:
+                # Check if repo is now empty and add placeholder if needed
+                if is_repo_empty(source):
+                    source = get_placeholder_source()
+                    placeholder_added = True
+                    logger.info("Repo is now empty, adding placeholder app")
+                
                 await save_source_json(source)
                 if GITHUB_TOKEN:
                     try:
+                        commit_msg = f"Remove version {version_to_delete}"
+                        if placeholder_added:
+                            commit_msg += " and restore placeholder"
                         github_pushed = await push_file_to_github(
                             SOURCE_JSON_PATH,
                             "repo/esign/source.json",
-                            f"Remove version {version_to_delete} from repository"
+                            commit_msg
                         )
                     except Exception as e:
                         logger.error(f"Failed to push source.json to GitHub: {e}")
@@ -1412,11 +1476,13 @@ async def callback_confirm_delete_version(callback: CallbackQuery, state: FSMCon
             release_status = "✅" if release_deleted else "⚠️ (not found)"
             source_status = "✅ (pushed to GitHub)" if github_pushed else "⚠️ (local only)" if updated_source else "⚠️"
             
+            placeholder_text = "\n📦 **Placeholder app restored** (repo was empty)" if placeholder_added else ""
+            
             await callback.message.edit_text(
                 f"✅ **GitHub Version Deleted**\n\n"
                 f"🗑️ Deleted version: `{version_to_delete}`\n"
                 f"🌐 **GitHub release:** {release_status}\n"
-                f"📄 **Source updated:** {source_status}",
+                f"📄 **Source updated:** {source_status}{placeholder_text}",
                 parse_mode=ParseMode.MARKDOWN,
             )
             await state.clear()
