@@ -665,6 +665,9 @@ router = Router()
 # Store pending uploads {user_id: {file_id, filename, version, size, message_id}}
 pending_uploads: dict = {}
 
+# Track cancelled downloads {user_id: True}
+cancelled_downloads: dict = {}
+
 
 def is_owner(user_id: int) -> bool:
     """Check if user is the bot owner."""
@@ -815,13 +818,19 @@ async def cmd_stop(message: Message, state: FSMContext) -> None:
 
     current_state = await state.get_state()
     
+    # Set cancellation flag for any active download
+    user_id = message.from_user.id
+    was_downloading = user_id in cancelled_downloads or current_state
+    cancelled_downloads[user_id] = True
+    
     # Clear state and pending uploads
     await state.clear()
-    pending_uploads.pop(message.from_user.id, None)
+    pending_uploads.pop(user_id, None)
     
-    if current_state:
+    if was_downloading or current_state:
         await message.answer(
-            "⏹️ **Operation cancelled.**",
+            "⏹️ **Operation cancelled.**\n\n"
+            "Any active download will stop shortly.",
             parse_mode=ParseMode.MARKDOWN,
         )
     else:
@@ -1948,16 +1957,22 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
 
     upload = pending_uploads[user_id]
     del pending_uploads[user_id]
+    
+    # Clear any previous cancellation flag for this user
+    cancelled_downloads.pop(user_id, None)
 
     await callback.answer("Starting download...")
 
     # Update message to show progress
     progress_msg = await callback.message.edit_text(
-        "📥 **Downloading IPA...**",
+        "📥 **Downloading IPA...**\n\n💡 Use /stop to cancel",
         parse_mode=ParseMode.MARKDOWN,
     )
 
     try:
+        # Check if cancelled before starting
+        if cancelled_downloads.get(user_id):
+            raise Exception("Download cancelled by user")
         # Create progress tracker
         tracker = ProgressTracker(
             bot=bot,
