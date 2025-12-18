@@ -1,0 +1,26 @@
+{
+  "name": "woomc repo",
+  "identifier": "xyz.woomc.repo",
+  "iconURL": "https://woomc.xyz/repo/esign/logo.png",
+  "website": "https://woomc.xyz/repo",
+  "sourceURL": "https://woomc.xyz/repo/esign/source.json",
+  "apps": [
+    {
+      "name": "SoundCloud",
+      "bundleIdentifier": "com.soundcloud.TouchApp",
+      "developerName": "woomc",
+      "iconURL": "https://woomc.xyz/repo/esign/logo.png",
+      "localizedDescription": "More apps will be added here soon!",
+      "subtitle": "Tweaked SoundCloud",
+      "tintColor": "FF5500",
+      "versions": [],
+      "appPermissions": {},
+      "screenshotURLs": [],
+      "version": "",
+      "versionDate": "",
+      "size": 0,
+      "downloadURL": ""
+    }
+  ],
+  "news": []
+}
