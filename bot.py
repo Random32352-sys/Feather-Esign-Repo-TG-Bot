@@ -159,10 +159,9 @@ def get_repository_url() -> str:
     return f"http://{ip}:{ESIGN_PORT}/esign"
 
 
-async def parallel_download(client, media, output_path, user_id, num_connections=4):
+async def parallel_download(client, media, output_path, user_id, tracker=None, num_connections=4):
     """
-    Parallel download using offset - VERIFIED WORKING
-    Expected: 12-15 MB/s with 4 connections
+    Parallel download using offset, with progress bar updates.
     """
     import asyncio
     import time
@@ -170,9 +169,41 @@ async def parallel_download(client, media, output_path, user_id, num_connections
     # Get total size
     file_size = media.size if hasattr(media, 'size') else media.document.size
     
-    part_size = file_size // num_connections
+    # Shared progress state
+    downloaded_bytes = 0
+    progress_lock = asyncio.Lock()
     
-    logger.info(f"Parallel download: {file_size/(1024**2):.1f}MB, {num_connections} connections")
+    async def update_progress(amount):
+        """Thread-safe progress increment"""
+        nonlocal downloaded_bytes
+        async with progress_lock:
+            downloaded_bytes += amount
+
+    async def monitor_progress():
+        """Background task to update UI periodically (throttled)"""
+        last_reported = 0
+        while downloaded_bytes < file_size:
+            # Check cancellation in monitor too
+            if cancelled_downloads.get(user_id):
+                break
+                
+            current = downloaded_bytes
+            if tracker and current > last_reported:
+                # Update UI every 2s to represent average speed and avoid flood wait
+                try:
+                    await tracker.update(current, file_size)
+                    last_reported = current
+                except Exception:
+                    pass # Ignore UI update errors
+            await asyncio.sleep(2.0)
+
+    # Start monitor task
+    monitor_task = None
+    if tracker:
+        monitor_task = asyncio.create_task(monitor_progress())
+    
+    part_size = file_size // num_connections
+    logger.info(f"Parallel download: {file_size/(1024**2):.1f}MB, 4 connections")
     
     async def download_range(start_offset, end_offset, part_id):
         """Download specific byte range"""
@@ -192,7 +223,11 @@ async def parallel_download(client, media, output_path, user_id, num_connections
                     file_size=file_size
                 ):
                     part_data += chunk
-                    current_offset += len(chunk)
+                    chunk_len = len(chunk)
+                    current_offset += chunk_len
+                    
+                    # Update internal counter
+                    await update_progress(chunk_len)
                     
                     if current_offset >= end_offset:
                         break
@@ -214,25 +249,42 @@ async def parallel_download(client, media, output_path, user_id, num_connections
         task = download_range(start, end, i)
         tasks.append(task)
     
-    # Download all simultaneously
-    start_time = time.time()
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    elapsed = time.time() - start_time
-    
-    # Check errors
-    for result in results:
-        if isinstance(result, Exception):
-            raise result
-    
-    # Write parts in order
-    with open(output_path, 'wb') as f:
-        for part_id, data in sorted(results):
-            f.write(data)
-    
-    speed_mbps = (file_size / (1024**2)) / elapsed
-    logger.info(f"✅ Downloaded {file_size/(1024**2):.1f}MB in {elapsed:.1f}s ({speed_mbps:.1f} MB/s)")
-    
-    return output_path
+    try:
+        # Download all simultaneously
+        start_time = time.time()
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        elapsed = time.time() - start_time
+        
+        # Check errors
+        for result in results:
+            if isinstance(result, Exception):
+                raise result
+        
+        # Write parts in order
+        with open(output_path, 'wb') as f:
+            for part_id, data in sorted(results):
+                f.write(data)
+        
+        speed_mbps = (file_size / (1024**2)) / elapsed
+        logger.info(f"✅ Downloaded {file_size/(1024**2):.1f}MB in {elapsed:.1f}s ({speed_mbps:.1f} MB/s)")
+        
+        return output_path
+        
+    finally:
+        # Ensure monitor is stopped
+        if monitor_task:
+            monitor_task.cancel()
+            try:
+                await monitor_task
+            except asyncio.CancelledError:
+                pass
+            # Final 100% update if successful
+            if tracker and not cancelled_downloads.get(user_id):
+                # Ensure it completes visually
+                try:
+                    await tracker.update(file_size, file_size)
+                except:
+                    pass
 
 
 def format_size(size_bytes: int) -> str:
@@ -2062,6 +2114,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                             saved_msg.media,
                             str(MAIN_IPA_PATH),
                             user_id,
+                            tracker=tracker,
                             num_connections=4
                         )
                     except FloodWaitError as e:
@@ -2072,6 +2125,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                             saved_msg.media,
                             str(MAIN_IPA_PATH),
                             user_id,
+                            tracker=tracker,
                             num_connections=3
                         )
                     except Exception as e:

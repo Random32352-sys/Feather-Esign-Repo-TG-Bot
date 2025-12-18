@@ -29,4 +29,4 @@
     - [x] Add Cancel (/stop) for active downloads
     - [x] Merge /cleanreleases into /deleteversion
 
-    - [x] Optimize Download Speed (Parallel Offset + cryptg)
+    - [x] Optimize Download Speed (Parallel Offset + cryptg + ETA)
