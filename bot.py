@@ -32,8 +32,7 @@ from aiogram.types import (
 )
 from dotenv import load_dotenv
 from telethon import TelegramClient
-from fast_telethon import download_file as fast_download
-from telethon.tl.types import DocumentAttributeFilename, InputDocumentFileLocation
+from telethon.tl.types import DocumentAttributeFilename
 
 # =============================================================================
 # CONFIGURATION
@@ -1978,36 +1977,20 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                 
                 if saved_msg and saved_msg.media:
                     # Define progress callback with cancellation check
-                    def progress_handler(current, total):
-                        if cancelled_downloads.get(user_id):
-                            raise Exception("Download cancelled by user")
-                        asyncio.create_task(tracker.update(current, total))
-
-                    # Use fast parallel download
-                    if hasattr(saved_msg.media, 'document'):
-                        doc = saved_msg.media.document
-                        location = InputDocumentFileLocation(
-                            id=doc.id,
-                            access_hash=doc.access_hash,
-                            file_reference=doc.file_reference,
-                            thumb_size=""
-                        )
-                        
-                        logger.info(f"Using FastTelethon parallel download for {upload['filename']}")
-                        await fast_download(
-                            telethon_client,
-                            location,
-                            out=str(MAIN_IPA_PATH),
-                            file_size=doc.size,
-                            progress_callback=progress_handler,
-                        )
-                    else:
-                        # Fallback for other media types (unlikely for IPA)
-                        await telethon_client.download_media(
-                            saved_msg,
-                            file=str(MAIN_IPA_PATH),
-                            progress_callback=progress_handler,
-                        )
+                    logger.info("Downloading via Telethon (iter_download)...")
+                    downloaded = 0
+                    total_size = upload["size"]
+                    
+                    # Use iter_download for efficient streaming check cancellation per chunk
+                    async with aiofiles.open(MAIN_IPA_PATH, "wb") as f:
+                        async for chunk in telethon_client.iter_download(saved_msg):
+                            if cancelled_downloads.get(user_id):
+                                raise Exception("Download cancelled by user")
+                                
+                            await f.write(chunk)
+                            downloaded += len(chunk)
+                            # Update progress periodically
+                            asyncio.create_task(tracker.update(downloaded, total_size))
                     logger.info("✅ Downloaded via Telethon from Saved Messages (fast)")
                     download_success = True
                 else:
