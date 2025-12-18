@@ -757,19 +757,28 @@ async def cmd_start(message: Message) -> None:
 
     source_url = f"{REPO_URL}/esign/source.json"
     help_text = (
-        "🚀 **ESign Repository Bot**\n\n"
-        "Manage your IPA repository for ESign/Feather apps.\n\n"
-        "**Commands:**\n"
-        "• /send - Upload a new IPA\n"
-        "• /stop - Cancel current operation\n"
-        "• /repoinfo - Repository status\n"
-        "• /setchangelog - Set changelog\n"
-        "• /setdescription - Set app description\n"
-        "• /deleteversion - Delete a version\n"
-        "• /cleanreleases - Clean orphaned GitHub releases\n"
-        "• /syncgithub - Force push source.json to GitHub\n\n"
-        f"**Repository URL:**\n`{REPO_URL}`\n\n"
-        f"**ESign Source URL:**\n`{source_url}`"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🚀 **woomc Repo Bot**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        "📤 **Upload & Manage**\n"
+        "├ /send — Upload new IPA\n"
+        "├ /deleteversion — Remove a version\n"
+        "└ /cleanreleases — Clean orphaned releases\n\n"
+        
+        "✏️ **Edit Content**\n"
+        "├ /setchangelog — Set changelog\n"
+        "└ /setdescription — Set app description\n\n"
+        
+        "📊 **Status & Sync**\n"
+        "├ /repoinfo — Repository status\n"
+        "├ /syncgithub — Force push to GitHub\n"
+        "└ /stop — Cancel current operation\n\n"
+        
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🌐 **Repo:** `{REPO_URL}`\n"
+        f"📱 **Source:** `{source_url}`\n"
+        "━━━━━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(help_text, parse_mode=ParseMode.MARKDOWN)
 
