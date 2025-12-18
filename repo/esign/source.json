@@ -1,6 +1,6 @@
 {
-  "name": "SoundCloud Repository",
-  "identifier": "com.soundcloud.repo",
+  "name": "woomc repo",
+  "identifier": "xyz.woomc.repo",
   "iconURL": "https://woomc.xyz/repo/esign/logo.png",
   "website": "https://woomc.xyz/repo",
   "sourceURL": "https://woomc.xyz/repo/esign/source.json",
