@@ -1321,14 +1321,24 @@ async def handle_document(message: Message, state: FSMContext) -> None:
 
     # Show confirmation
     source_info = "⚡ **Fast download** (from Saved Messages)" if saved_msg_id else "📥 Will download via bot API"
+    
+    # Get current description
+    source = await load_source_json()
+    description = ""
+    if source.get("apps") and len(source["apps"]) > 0:
+        description = source["apps"][0].get("localizedDescription", "")
+    if not description:
+        description = "Not set"
+    
     text = (
         "📦 **Detected IPA File**\n\n"
         f"📄 **Filename:** `{filename}`\n"
         f"🏷️ **Version:** `{version}`\n"
         f"💾 **Size:** {format_size(size)}\n"
         f"{source_info}\n\n"
+        f"📋 **Description:**\n_{description}_\n\n"
         f"📝 **Changelog:**\n_{changelog}_\n\n"
-        "Press **Confirm** to upload or **Edit Changelog** to modify."
+        "Press **Confirm** to upload or edit fields below."
     )
 
     await message.answer(
