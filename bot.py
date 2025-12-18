@@ -705,11 +705,16 @@ def build_version_delete_keyboard(versions: list) -> InlineKeyboardMarkup:
                 is_untracked = "path" in version
                 # Check if this is a GitHub release (has "source" key)
                 is_github = version.get("source") == "github"
+                # Check if this is an orphaned release
+                is_orphan = version.get("source") == "orphan"
                 
                 if is_untracked:
                     prefix = "⚠️"
                     display_name = version.get("filename", version_str)
                     button_text = f"{prefix} {display_name}"
+                elif is_orphan:
+                    prefix = "⚠️"
+                    button_text = f"{prefix} Clean {version.get('tag', version_str)}"
                 elif is_github:
                     prefix = "🌐"
                     # Show app name if available, otherwise version
@@ -722,12 +727,14 @@ def build_version_delete_keyboard(versions: list) -> InlineKeyboardMarkup:
                     prefix = "🗑️"
                     button_text = f"{prefix} {version_str}"
                     
-                if date_str:
+                if date_str and not is_orphan:
                     button_text += f" ({date_str})"
                     
                 # Include type marker in callback data
                 if is_untracked:
                     callback_data = f"delete_version:{version_str}:untracked:{version.get('filename', '')}"
+                elif is_orphan:
+                    callback_data = f"clean_release:{version.get('tag', version_str)}"
                 elif is_github:
                     callback_data = f"delete_version:{version_str}:github"
                 else:
@@ -766,8 +773,7 @@ async def cmd_start(message: Message) -> None:
         
         "📤 **Upload & Manage**\n"
         "├ /send — Upload new IPA\n"
-        "├ /deleteversion — Remove a version\n"
-        "└ /cleanreleases — Clean orphaned releases\n\n"
+        "└ /deleteversion — Delete version / clean orphans\n\n"
         
         "✏️ **Edit Content**\n"
         "├ /setchangelog — Set changelog\n"
@@ -1047,84 +1053,7 @@ async def cmd_syncgithub(message: Message) -> None:
         await message.answer(f"❌ **Error:** `{str(e)}`", parse_mode=ParseMode.MARKDOWN)
 
 
-@router.message(Command("cleanreleases"))
-async def cmd_cleanreleases(message: Message) -> None:
-    """Find and delete orphaned GitHub Releases not in source.json."""
-    if not is_owner(message.from_user.id):
-        return
 
-    if not GITHUB_TOKEN or not GITHUB_OWNER or not GITHUB_REPO:
-        await message.answer("❌ GitHub not configured", parse_mode=ParseMode.MARKDOWN)
-        return
-
-    await message.answer("🔍 **Scanning GitHub Releases...**", parse_mode=ParseMode.MARKDOWN)
-
-    try:
-        # Get versions from source.json
-        source = await load_source_json()
-        source_versions = set()
-        if source.get("apps"):
-            for app in source["apps"]:
-                for version in app.get("versions", []):
-                    source_versions.add(version.get("version", ""))
-
-        # Get GitHub releases
-        headers = {
-            "Authorization": f"token {GITHUB_TOKEN}",
-            "Accept": "application/vnd.github.v3+json",
-        }
-        
-        orphaned_releases = []
-        
-        async with aiohttp.ClientSession() as session:
-            url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
-            async with session.get(url, headers=headers) as resp:
-                if resp.status == 200:
-                    releases = await resp.json()
-                    for release in releases:
-                        tag = release.get("tag_name", "")
-                        # Remove 'v' prefix to match version
-                        version = tag.lstrip("v")
-                        if version and version not in source_versions:
-                            orphaned_releases.append({
-                                "tag": tag,
-                                "version": version,
-                                "name": release.get("name", ""),
-                                "id": release.get("id"),
-                            })
-
-        if not orphaned_releases:
-            await message.answer(
-                "✅ **No orphaned releases found!**\n\n"
-                "All GitHub Releases are properly tracked in source.json.",
-                parse_mode=ParseMode.MARKDOWN,
-            )
-            return
-
-        # Build keyboard for orphaned releases
-        buttons = []
-        for release in orphaned_releases:
-            buttons.append([
-                InlineKeyboardButton(
-                    text=f"🗑️ Delete {release['name']} ({release['tag']})",
-                    callback_data=f"clean_release:{release['tag']}"
-                )
-            ])
-        buttons.append([InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_clean")])
-
-        keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-
-        await message.answer(
-            f"⚠️ **Found {len(orphaned_releases)} Orphaned Release(s)**\n\n"
-            "These releases exist on GitHub but are NOT in source.json:\n\n"
-            + "\n".join([f"• `{r['tag']}` - {r['name']}" for r in orphaned_releases]) +
-            "\n\nSelect a release to delete:",
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=keyboard,
-        )
-
-    except Exception as e:
-        await message.answer(f"❌ **Error:** `{str(e)}`", parse_mode=ParseMode.MARKDOWN)
 
 
 @router.callback_query(F.data.startswith("clean_release:"))
@@ -1228,7 +1157,47 @@ async def cmd_deleteversion(message: Message) -> None:
                             "source": "github",  # Mark as GitHub release
                         })
     
-    if not versions and not untracked_files and not source_versions:
+    # Check for orphaned GitHub releases (on GitHub but not in source.json)
+    orphaned_releases = []
+    if GITHUB_TOKEN and GITHUB_OWNER and GITHUB_REPO:
+        try:
+            # We already loaded source_versions (which are in source.json but maybe not local)
+            # tracked_versions contains local versions
+            # source_versions contains source.json versions
+            
+            # Combine all known valid versions
+            valid_versions = tracked_versions.copy()
+            for sv in source_versions:
+                valid_versions.add(sv["version"])
+            
+            # Fetch GitHub releases
+            headers = {
+                "Authorization": f"token {GITHUB_TOKEN}",
+                "Accept": "application/vnd.github.v3+json",
+            }
+            async with aiohttp.ClientSession() as session:
+                url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
+                async with session.get(url, headers=headers) as resp:
+                    if resp.status == 200:
+                        releases = await resp.json()
+                        for release in releases:
+                            tag = release.get("tag_name", "")
+                            # Remove 'v' prefix to match version
+                            version = tag.lstrip("v")
+                            
+                            # If version is NOT in valid_versions, it's an orphan
+                            if version and version not in valid_versions:
+                                orphaned_releases.append({
+                                    "version": version,
+                                    "tag": tag,
+                                    "app_name": release.get("name", "Unknown"),
+                                    "source": "orphan", # Mark as orphan
+                                    "date": release.get("published_at", "")[:10]
+                                })
+        except Exception as e:
+            logger.error(f"Failed to scan orphans: {e}")
+    
+    if not versions and not untracked_files and not source_versions and not orphaned_releases:
         await message.answer(
             "📦 **No versions found**\n\nThere are no versions to delete.",
             parse_mode=ParseMode.MARKDOWN,
@@ -1246,11 +1215,13 @@ async def cmd_deleteversion(message: Message) -> None:
         text += f"⚠️ **Untracked files:** {len(untracked_files)}\n"
     if source_versions:
         text += f"🌐 **GitHub releases:** {len(source_versions)}\n"
+    if orphaned_releases:
+        text += f"⚠️ **Orphaned releases:** {len(orphaned_releases)}\n"
     text += f"📱 **Current version:** `{current_version or 'None'}`\n\n"
     text += "Select a version to delete:"
     
-    # Combine tracked, untracked, and source versions for display
-    all_items = versions_sorted + untracked_files + source_versions
+    # Combine tracked, untracked, source versions, and orphans for display
+    all_items = versions_sorted + untracked_files + source_versions + orphaned_releases
     
     await message.answer(
         text,
@@ -2306,7 +2277,6 @@ async def main() -> None:
         BotCommand(command="setchangelog", description="Set changelog text"),
         BotCommand(command="setdescription", description="Set app description"),
         BotCommand(command="deleteversion", description="Delete a version"),
-        BotCommand(command="cleanreleases", description="Clean orphaned GitHub releases"),
         BotCommand(command="syncgithub", description="Force push source.json to GitHub"),
     ]
     await bot.set_my_commands(commands)
