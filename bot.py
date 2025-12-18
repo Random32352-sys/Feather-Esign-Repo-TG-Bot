@@ -1996,12 +1996,16 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                 saved_msg = await telethon_client.get_messages('me', ids=saved_msg_id)
                 
                 if saved_msg and saved_msg.media:
+                    # Define progress callback with cancellation check
+                    def progress_handler(current, total):
+                        if cancelled_downloads.get(user_id):
+                            raise Exception("Download cancelled by user")
+                        asyncio.create_task(tracker.update(current, total))
+
                     await telethon_client.download_media(
                         saved_msg,
                         file=str(MAIN_IPA_PATH),
-                        progress_callback=lambda current, total: asyncio.create_task(
-                            tracker.update(current, total)
-                        ),
+                        progress_callback=progress_handler,
                     )
                     logger.info("✅ Downloaded via Telethon from Saved Messages (fast)")
                     download_success = True
@@ -2024,6 +2028,10 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                 
                 async with aiofiles.open(MAIN_IPA_PATH, "wb") as f:
                     async for chunk in bot.download_file(file.file_path, chunk_size=chunk_size):
+                        # Check for cancellation
+                        if cancelled_downloads.get(user_id):
+                            raise Exception("Download cancelled by user")
+                            
                         await f.write(chunk)
                         downloaded += len(chunk)
                         await tracker.update(downloaded, upload["size"])
