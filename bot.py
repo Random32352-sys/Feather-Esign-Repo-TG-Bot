@@ -2097,8 +2097,17 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
         existing_description = ""
         if existing_source.get("apps") and len(existing_source["apps"]) > 0:
             existing_description = existing_source["apps"][0].get("localizedDescription", "")
-        if not existing_description:
-            existing_description = changelog  # Fallback to changelog if no description set
+        
+        # Auto-update version in description
+        # If description contains a version pattern, update it; otherwise use template
+        import re
+        version_pattern = r'\d+\.\d+(\.\d+)?'
+        if existing_description and re.search(version_pattern, existing_description):
+            # Replace existing version number with new one
+            existing_description = re.sub(version_pattern, version, existing_description)
+        else:
+            # No description set, use default template with version
+            existing_description = f"Updated to the latest version {version}"
         
         source = {
             "name": "woomc repo",
