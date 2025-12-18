@@ -24,4 +24,7 @@
 2.  [ ] **Step 2**: Configure DNS in Spaceship
 3.  [ ] **Step 3**: Update branding & URLs in code
 4.  [x] Push changes to GitHub (Logo fix, UI improvements)
-5.  [ ] Test Telegram bot functionality
+6.  [x] **Step 4**: Bot Improvements
+    - [x] Fix Telethon download path (Saved Messages)
+    - [x] Add Cancel (/stop) for active downloads
+    - [x] Merge /cleanreleases into /deleteversion

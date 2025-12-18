@@ -807,11 +807,20 @@ async def cmd_send(message: Message, state: FSMContext) -> None:
     changelog = await load_changelog()
     
     await message.answer(
-        "📤 **Upload IPA**\n\n"
-        "Send or forward an IPA file to upload.\n\n"
-        f"📝 **Current changelog:**\n_{changelog}_\n\n"
-        "💡 **Tip:** Forward from Saved Messages for fast upload!\n\n"
-        "❌ Cancel: /stop",
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "📤 **Upload New App Version**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "1️⃣ **Forward IPA File**\n"
+        "   Forward the `.ipa` file from your\n"
+        "   **Saved Messages** for instant speed ⚡\n\n"
+        "2️⃣ **Or Send File Here**\n"
+        "   Upload directly to this chat 📤\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📝 **Auto-Changelog:**\n"
+        f"_{changelog}_\n\n"
+        "💡 **Tip:** Forwarding from 'Saved Messages'\n"
+        "is much faster and has no size limits!\n"
+        "━━━━━━━━━━━━━━━━━━━━━━",
         parse_mode=ParseMode.MARKDOWN,
     )
 
