@@ -410,14 +410,10 @@ def is_repo_empty(source: dict) -> bool:
 
 async def upload_to_github_release(file_path: Path, version: str, changelog: str) -> Optional[str]:
     """Upload IPA to GitHub Releases and return the download URL."""
-    # #region agent log
-    log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:247", "message": "upload_to_github_release entry", "data": {"version": version, "file_path": str(file_path), "file_exists": file_path.exists(), "has_token": bool(GITHUB_TOKEN), "has_owner": bool(GITHUB_OWNER), "has_repo": bool(GITHUB_REPO)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-    # #endregion
+
     if not GITHUB_TOKEN or not GITHUB_OWNER or not GITHUB_REPO:
         logger.error("GitHub configuration missing")
-        # #region agent log
-        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:252", "message": "GitHub config missing", "data": {"has_token": bool(GITHUB_TOKEN), "has_owner": bool(GITHUB_OWNER), "has_repo": bool(GITHUB_REPO)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-        # #endregion
+
         return None
     
     headers = {
@@ -476,30 +472,22 @@ async def upload_to_github_release(file_path: Path, version: str, changelog: str
                 file_data = await f.read()
             
             async with session.post(upload_url, headers=upload_headers, data=file_data) as upload_resp:
-                # #region agent log
-                log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:308", "message": "GitHub asset upload response", "data": {"status": upload_resp.status, "file_size": len(file_data)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-                # #endregion
+
                 if upload_resp.status == 201:
                     asset_data = await upload_resp.json()
                     download_url = asset_data["browser_download_url"]
                     logger.info(f"Uploaded IPA to GitHub: {download_url}")
-                    # #region agent log
-                    log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:312", "message": "GitHub upload success", "data": {"download_url": download_url}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-                    # #endregion
+
                     return download_url
                 else:
                     error = await upload_resp.text()
                     logger.error(f"Failed to upload asset: {error}")
-                    # #region agent log
-                    log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:316", "message": "GitHub upload failed", "data": {"status": upload_resp.status, "error": error[:200]}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-                    # #endregion
+
                     return None
                     
     except Exception as e:
         logger.error(f"GitHub upload error: {e}")
-        # #region agent log
-        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:320", "message": "GitHub upload exception", "data": {"error": str(e)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-        # #endregion
+
         return None
 
 
@@ -570,9 +558,7 @@ async def push_file_to_github(file_path: Path, repo_path: str, commit_message: s
             async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
                 content = await f.read()
             
-            # #region agent log
-            log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D", "location": "bot.py:407", "message": "Content being pushed to GitHub", "data": {"content_preview": content[:300], "content_length": len(content), "sha_found": sha is not None, "repo_path": repo_path}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-            # #endregion
+
             
             import base64
             encoded_content = base64.b64encode(content.encode()).decode()
@@ -587,25 +573,19 @@ async def push_file_to_github(file_path: Path, repo_path: str, commit_message: s
             
             async with session.put(file_url, headers=headers, json=payload) as resp:
                 resp_body = await resp.text()
-                # #region agent log
-                log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D", "location": "bot.py:420", "message": "GitHub file push response", "data": {"status": resp.status, "repo_path": repo_path, "response_preview": resp_body[:300] if resp_body else "empty"}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-                # #endregion
+
                 if resp.status in [200, 201]:
                     logger.info(f"Pushed {repo_path} to GitHub")
                     return True
                 else:
                     error = await resp.text()
                     logger.error(f"Failed to push file: {error}")
-                    # #region agent log
-                    log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "bot.py:367", "message": "GitHub push failed", "data": {"status": resp.status, "error": error[:200]}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-                    # #endregion
+
                     return False
                     
     except Exception as e:
         logger.error(f"GitHub push error: {e}")
-        # #region agent log
-        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "bot.py:371", "message": "GitHub push exception", "data": {"error": str(e)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-        # #endregion
+
         return False
 
 
@@ -2155,15 +2135,11 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
             parse_mode=ParseMode.MARKDOWN,
         )
         
-        # #region agent log
-        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:1219", "message": "Before GitHub release upload", "data": {"version": version, "file_exists": MAIN_IPA_PATH.exists(), "file_size": MAIN_IPA_PATH.stat().st_size if MAIN_IPA_PATH.exists() else 0, "has_github_config": bool(GITHUB_TOKEN and GITHUB_OWNER and GITHUB_REPO)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-        # #endregion
+
         
         github_download_url = await upload_to_github_release(MAIN_IPA_PATH, version, changelog)
         
-        # #region agent log
-        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "bot.py:1222", "message": "After GitHub release upload", "data": {"success": github_download_url is not None, "download_url": github_download_url or "None"}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-        # #endregion
+
         
         if github_download_url:
             download_url = github_download_url
@@ -2264,9 +2240,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
         # Push source.json to GitHub
         github_pushed = False
         if GITHUB_TOKEN:
-            # #region agent log
-            log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "bot.py:1297", "message": "Before pushing source.json to GitHub", "data": {"source_json_exists": SOURCE_JSON_PATH.exists(), "has_github_token": bool(GITHUB_TOKEN)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-            # #endregion
+
             await bot.edit_message_text(
                 text="🔄 **Pushing to GitHub...**",
                 chat_id=callback.message.chat.id,
@@ -2278,9 +2252,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                 "repo/esign/source.json",
                 f"Update source.json for v{version}"
             )
-            # #region agent log
-            log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "bot.py:1308", "message": "After pushing source.json to GitHub", "data": {"success": github_pushed}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-            # #endregion
+
             if github_pushed:
                 logger.info("Pushed source.json to GitHub")
 
