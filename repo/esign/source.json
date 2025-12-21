@@ -12,19 +12,18 @@
       "iconURL": "https://woomc.xyz/repo/esign/logo.png",
       "localizedDescription": "More apps will be added here soon!",
       "subtitle": "Stay tuned",
-      "tintColor": "808080",
+      "tintColor": "#808080",
       "versions": [
         {
           "version": "1.0",
-          "date": "2025-12-21T15:20:00Z",
+          "date": "2025-12-21T15:27:24Z",
           "size": 0,
           "downloadURL": "https://woomc.xyz/repo/esign/source.json"
         }
       ],
-      "appPermissions": {},
       "screenshotURLs": [],
       "version": "1.0",
-      "versionDate": "2025-12-21T15:20:00Z",
+      "versionDate": "2025-12-21T15:27:24Z",
       "size": 0,
       "downloadURL": "https://woomc.xyz/repo/esign/source.json"
     }
