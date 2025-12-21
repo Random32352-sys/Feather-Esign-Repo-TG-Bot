@@ -12,7 +12,7 @@
       "iconURL": "https://woomc.xyz/repo/esign/logo.png",
       "localizedDescription": "Updated to version 8.42.3",
       "subtitle": "Tweaked SoundCloud",
-      "tintColor": "FF5500",
+      "tintColor": "#FF5500",
       "versions": [
         {
           "version": "8.42.3",
@@ -22,7 +22,6 @@
           "localizedDescription": "Updated to the latest version"
         }
       ],
-      "appPermissions": {},
       "screenshotURLs": [],
       "version": "8.42.3",
       "versionDate": "2025-12-21T15:04:36Z",

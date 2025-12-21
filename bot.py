@@ -335,7 +335,7 @@ def get_placeholder_source() -> dict:
                 "iconURL": f"{REPO_URL}/esign/logo.png",
                 "localizedDescription": "More apps will be added here soon!",
                 "subtitle": "Stay tuned",
-                "tintColor": "808080",
+                "tintColor": "#808080",
                 "versions": [
                     {
                         "version": "1.0",
@@ -344,7 +344,7 @@ def get_placeholder_source() -> dict:
                         "downloadURL": f"{REPO_URL}/esign/source.json"
                     }
                 ],
-                "appPermissions": {},
+                # "appPermissions": {},
                 "screenshotURLs": [],
                 "version": "1.0",
                 "versionDate": now_iso,
@@ -2184,7 +2184,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                     "iconURL": f"{REPO_URL}/esign/logo.png",
                     "localizedDescription": existing_description,
                     "subtitle": "Tweaked SoundCloud",
-                    "tintColor": "FF5500",
+                    "tintColor": "#FF5500",
                     "versions": [
                         {
                             "version": version,
@@ -2194,7 +2194,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                             "localizedDescription": changelog,
                         }
                     ],
-                    "appPermissions": {},
+                    # "appPermissions": {}, # Removed for Feather compatibility
                     "screenshotURLs": [],
                     # Duplicate fields required by Feather
                     "version": version,
