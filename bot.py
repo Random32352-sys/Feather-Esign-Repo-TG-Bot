@@ -332,7 +332,7 @@ def get_placeholder_source() -> dict:
                 "name": "Coming Soon",
                 "bundleIdentifier": "com.placeholder.app",
                 "developerName": "woomc",
-                "iconURL": f"{REPO_URL}/esign/logo.png",
+                "iconURL": f"{REPO_URL}/esign/soundcloud.png",
                 "localizedDescription": "More apps will be added here soon!",
                 "subtitle": "Stay tuned",
                 "tintColor": "#808080",
@@ -620,39 +620,61 @@ async def restore_placeholder_ipa() -> bool:
     placeholder_path = PROJECT_PATH / "assets" / "placeholder.ipa"
     target_path = MAIN_IPA_PATH
 
-    def _restore():
-        if not placeholder_path.exists():
-            logger.error(
-                f"CRITICAL: placeholder.ipa not found at {placeholder_path}. "
-                "Cannot restore safe state after version deletion."
-            )
-            return False
-        try:
-            shutil.copy2(placeholder_path, target_path)
-            logger.info(f"Restored placeholder.ipa to {target_path}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to restore placeholder.ipa: {e}")
-            return False
+    async def _restore_attempt():
+        def _copy():
+            if not placeholder_path.exists():
+                logger.error(
+                    f"CRITICAL: placeholder.ipa not found at {placeholder_path}. "
+                    "Cannot restore safe state after version deletion."
+                )
+                return False
+            try:
+                shutil.copy2(placeholder_path, target_path)
+                logger.info(f"Restored placeholder.ipa to {target_path}")
+                return True
+            except Exception as e:
+                logger.warning(f"Attempt to restore placeholder failed: {e}")
+                return False
 
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(executor, _restore)
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(executor, _copy)
+    
+    # Retry logic (3 attempts, 1s delay) to handle file locks
+    for i in range(3):
+        if await _restore_attempt():
+            return True
+        if i < 2:
+            await asyncio.sleep(1)
+            
+    logger.error("Failed to restore placeholder.ipa after 3 attempts")
+    return False
 
 
 async def delete_file_async(file_path: Path) -> bool:
-    """Delete a file asynchronously (non-blocking)."""
-    def _delete():
-        try:
-            if file_path.exists():
-                file_path.unlink()
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"Error deleting file {file_path}: {e}")
-            return False
+    """Delete a file asynchronously (non-blocking) with retries."""
+    async def _delete_attempt():
+        def _delete():
+            try:
+                if file_path.exists():
+                    file_path.unlink()
+                    return True
+                return True # Consider success if file doesn't exist
+            except Exception as e:
+                logger.warning(f"Error deleting file {file_path}: {e}")
+                return False
 
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(executor, _delete)
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(executor, _delete)
+
+    # Retry logic (3 attempts, 1s delay)
+    for i in range(3):
+        if await _delete_attempt():
+            return True
+        if i < 2:
+            await asyncio.sleep(1)
+            
+    logger.error(f"Failed to delete {file_path} after 3 attempts")
+    return False
 
 
 async def cleanup_old_versions(history: dict) -> None:
