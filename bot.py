@@ -321,9 +321,11 @@ def _apply_cache_busting(source: dict) -> dict:
         return source
 
     for app in source["apps"]:
-        # Update app-level downloadURL
+        # Update app-level downloadURL and iconURL
         if app.get("downloadURL"):
             app["downloadURL"] = _add_cache_bust_timestamp(app["downloadURL"])
+        if app.get("iconURL"):
+            app["iconURL"] = _add_cache_bust_timestamp(app["iconURL"])
 
         # Update all version downloadURLs
         if app.get("versions"):
