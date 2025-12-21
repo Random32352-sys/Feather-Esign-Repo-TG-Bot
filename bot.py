@@ -305,12 +305,44 @@ async def load_source_json() -> dict:
     return {"apps": []}
 
 
+def _add_cache_bust_timestamp(url: str) -> str:
+    """Add or update cache-busting timestamp query parameter to a URL."""
+    if not url:
+        return url
+    # Remove existing timestamp if present
+    base_url = url.split("?t=")[0]
+    # Add fresh timestamp
+    return f"{base_url}?t={int(time.time())}"
+
+
+def _apply_cache_busting(source: dict) -> dict:
+    """Apply cache-busting timestamps to all downloadURLs in source.json."""
+    if not source.get("apps"):
+        return source
+
+    for app in source["apps"]:
+        # Update app-level downloadURL
+        if app.get("downloadURL"):
+            app["downloadURL"] = _add_cache_bust_timestamp(app["downloadURL"])
+
+        # Update all version downloadURLs
+        if app.get("versions"):
+            for version in app["versions"]:
+                if version.get("downloadURL"):
+                    version["downloadURL"] = _add_cache_bust_timestamp(version["downloadURL"])
+
+    return source
+
+
 async def save_source_json(source: dict) -> bool:
-    """Save source.json atomically."""
+    """Save source.json atomically with cache-busting timestamps."""
     try:
+        # Apply cache-busting to all downloadURLs before saving
+        source_with_cache_bust = _apply_cache_busting(source)
+
         tmp_path = SOURCE_JSON_PATH.with_suffix(".tmp")
         async with aiofiles.open(tmp_path, "w", encoding="utf-8") as f:
-            await f.write(json.dumps(source, indent=2))
+            await f.write(json.dumps(source_with_cache_bust, indent=2))
         tmp_path.replace(SOURCE_JSON_PATH)
         return True
     except Exception as e:
