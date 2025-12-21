@@ -324,7 +324,7 @@ def get_placeholder_source() -> dict:
     return {
         "name": "woomc repo",
         "identifier": "xyz.woomc.repo",
-        "iconURL": f"{REPO_URL}/esign/logo.png",
+        "iconURL": f"{REPO_URL}/esign/repo_icon.png",
         "website": REPO_URL,
         "sourceURL": f"{REPO_URL}/esign/source.json",
         "apps": [
@@ -332,7 +332,7 @@ def get_placeholder_source() -> dict:
                 "name": "Coming Soon",
                 "bundleIdentifier": "com.placeholder.app",
                 "developerName": "woomc",
-                "iconURL": f"{REPO_URL}/esign/soundcloud.png",
+                "iconURL": f"{REPO_URL}/esign/app_icon.png",
                 "localizedDescription": "More apps will be added here soon!",
                 "subtitle": "Stay tuned",
                 "tintColor": "#808080",
@@ -2195,7 +2195,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
         source = {
             "name": "woomc repo",
             "identifier": "xyz.woomc.repo",
-            "iconURL": f"{REPO_URL}/esign/logo.png",
+            "iconURL": f"{REPO_URL}/esign/repo_icon.png",
             "website": REPO_URL,
             "sourceURL": f"{REPO_URL}/esign/source.json",
             "apps": [
@@ -2203,7 +2203,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                     "name": "SoundCloud",
                     "bundleIdentifier": "com.soundcloud.TouchApp",
                     "developerName": "woomc",
-                    "iconURL": f"{REPO_URL}/esign/logo.png",
+                    "iconURL": f"{REPO_URL}/esign/app_icon.png",
                     "localizedDescription": existing_description,
                     "subtitle": "Tweaked SoundCloud",
                     "tintColor": "#FF5500",

@@ -1,32 +1,32 @@
 {
-  "name": "woomc repo",
-  "identifier": "xyz.woomc.repo",
-  "iconURL": "https://woomc.xyz/repo/esign/logo.png",
-  "website": "https://woomc.xyz/repo",
-  "sourceURL": "https://woomc.xyz/repo/esign/source.json",
-  "apps": [
-    {
-      "name": "Coming Soon",
-      "bundleIdentifier": "com.placeholder.app",
-      "developerName": "woomc",
-      "iconURL": "https://woomc.xyz/repo/esign/soundcloud.png",
-      "localizedDescription": "More apps will be added here soon!",
-      "subtitle": "Stay tuned",
-      "tintColor": "#808080",
-      "versions": [
+    "name": "woomc repo",
+    "identifier": "xyz.woomc.repo",
+    "iconURL": "https://woomc.xyz/repo/esign/repo_icon.png",
+    "website": "https://woomc.xyz/repo",
+    "sourceURL": "https://woomc.xyz/repo/esign/source.json",
+    "apps": [
         {
-          "version": "1.0",
-          "date": "2025-12-21T15:27:24Z",
-          "size": 0,
-          "downloadURL": "https://woomc.xyz/repo/esign/source.json"
+            "name": "Coming Soon",
+            "bundleIdentifier": "com.placeholder.app",
+            "developerName": "woomc",
+            "iconURL": "https://woomc.xyz/repo/esign/app_icon.png",
+            "localizedDescription": "More apps will be added here soon!",
+            "subtitle": "Stay tuned",
+            "tintColor": "#808080",
+            "versions": [
+                {
+                    "version": "1.0",
+                    "date": "2025-12-21T15:27:24Z",
+                    "size": 0,
+                    "downloadURL": "https://woomc.xyz/repo/esign/source.json"
+                }
+            ],
+            "screenshotURLs": [],
+            "version": "1.0",
+            "versionDate": "2025-12-21T15:27:24Z",
+            "size": 0,
+            "downloadURL": "https://woomc.xyz/repo/esign/source.json"
         }
-      ],
-      "screenshotURLs": [],
-      "version": "1.0",
-      "versionDate": "2025-12-21T15:27:24Z",
-      "size": 0,
-      "downloadURL": "https://woomc.xyz/repo/esign/source.json"
-    }
-  ],
-  "news": []
+    ],
+    "news": []
 }
