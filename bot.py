@@ -4,6 +4,7 @@ Manages ESign/Feather app repository on Windows IIS with fast Telethon downloads
 """
 
 import asyncio
+import functools
 import json
 import logging
 import os
@@ -11,6 +12,8 @@ import re
 import shutil
 import socket
 import sys
+import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -98,6 +101,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("ESignBot")
 
+# Check for cryptg optimization
+try:
+    import telethon.crypto.aes
+    if getattr(telethon.crypto.aes, 'cryptg', None):
+        logger.info("🔮 Telethon Crypto Mode: cryptg (Accelerated)")
+    else:
+        logger.warning("⚠️ Telethon Crypto Mode: pyaes (Slow - Install cryptg)")
+except Exception:
+    logger.warning("⚠️ Telethon crypto mode detection failed")
+
+
 # =============================================================================
 # FSM STATES
 # =============================================================================
@@ -159,146 +173,63 @@ def get_repository_url() -> str:
     return f"http://{ip}:{ESIGN_PORT}/esign"
 
 
-async def parallel_download(client, media, output_path, user_id, tracker=None, num_connections=4):
+async def fast_download(client, media, output_path, user_id, tracker=None):
     """
-    Parallel download with LIVE ETA - NO lock contention
-    Expected: 12-15 MB/s + live ETA updates
+    Simple single-stream download - reliable and fast with cryptg.
+    Expected: 20-40 MB/s from US VPS to DC1.
     """
-    import asyncio
-    import time
-    from collections import deque
-    
-    # Get total size
     file_size = media.size if hasattr(media, 'size') else media.document.size
-    part_size = file_size // num_connections
-    
-    logger.info(f"Parallel download: {file_size/(1024**2):.1f}MB, {num_connections} connections")
-    
-    # Shared state - NO lock needed in asyncio (cooperative multitasking)
-    progress = {'bytes': 0, 'start': time.time()}
-    speed_history = deque(maxlen=10)  # Last 10 speed samples
-    
-    async def live_eta_update():
-        """Background: Update UI with live ETA every 2 seconds"""
-        last_bytes = 0
-        last_time = time.time()
-        
-        while progress['bytes'] < file_size:
-            await asyncio.sleep(2.0)
-            
-            # Check cancellation
-            if cancelled_downloads.get(user_id):
-                break
-                
-            now = time.time()
-            current = progress['bytes']
-            
-            # Calculate current speed
+
+    logger.info(f"🚀 Starting download: {file_size/(1024**2):.1f}MB")
+
+    start_time = time.time()
+    last_update = start_time
+    speed_samples = deque(maxlen=10)
+    last_bytes = 0
+
+    async def progress_callback(current, total):
+        nonlocal last_update, last_bytes
+
+        if cancelled_downloads.get(user_id):
+            raise Exception("Download cancelled")
+
+        now = time.time()
+        if now - last_update >= 1.5 and tracker:
+            time_delta = now - last_update
             bytes_delta = current - last_bytes
-            time_delta = now - last_time
             speed = bytes_delta / time_delta if time_delta > 0 else 0
-            speed_history.append(speed)
-            
-            # Average speed
-            avg_speed = sum(speed_history) / len(speed_history) if speed_history else 0
-            
-            # ETA
-            remaining = file_size - current
+            speed_samples.append(speed)
+            avg_speed = sum(speed_samples) / len(speed_samples)
+
+            remaining = total - current
             if avg_speed > 0:
                 eta_sec = remaining / avg_speed
-                eta = f"{int(eta_sec//60)}m {int(eta_sec%60)}s"
+                eta = f"{int(eta_sec//60)}m {int(eta_sec%60)}s" if eta_sec >= 60 else f"{int(eta_sec)}s"
             else:
                 eta = "calculating..."
-            
-            if tracker:
-                try:
-                    await tracker.update(current, file_size, eta=eta, speed=avg_speed)
-                except Exception:
-                    pass
-            
-            last_bytes = current
-            last_time = now
 
-    async def download_range(start_offset, end_offset, part_id):
-        """Download range - NO LOCKS"""
-        part_data = b''
-        current_offset = start_offset
-        
-        while current_offset < end_offset:
-            if cancelled_downloads.get(user_id):
-                raise Exception("Download cancelled")
-            
             try:
-                # KEY: offset parameter = parallel download
-                async for chunk in client.iter_download(
-                    media, 
-                    offset=current_offset,
-                    file_size=file_size
-                ):
-                    part_data += chunk
-                    current_offset += len(chunk)
-                    progress['bytes'] += len(chunk)  # Safe in asyncio
-                    
-                    if current_offset >= end_offset:
-                        break
-                
-                break
-                
-            except Exception as e:
-                logger.warning(f"Part {part_id} retry: {e}")
-                await asyncio.sleep(0.5)
-                continue
-        
-        return (part_id, part_data)
-    
-    # Create tasks
-    tasks = []
-    for i in range(num_connections):
-        start = i * part_size
-        end = file_size if i == num_connections - 1 else (i + 1) * part_size
-        task = download_range(start, end, i)
-        tasks.append(task)
-    
-    # Start live ETA task
-    eta_task = None
-    if tracker:
-        eta_task = asyncio.create_task(live_eta_update())
-
-    try:
-        # Download all simultaneously
-        start_time = time.time()
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        elapsed = time.time() - start_time
-        
-        # Check errors
-        for result in results:
-            if isinstance(result, Exception):
-                raise result
-        
-        # Write parts in order
-        with open(output_path, 'wb') as f:
-            for part_id, data in sorted(results):
-                f.write(data)
-        
-        speed_mbps = (file_size / (1024**2)) / elapsed
-        logger.info(f"✅ Downloaded {file_size/(1024**2):.1f}MB in {elapsed:.1f}s ({speed_mbps:.1f} MB/s)")
-        
-        return output_path
-        
-    finally:
-        # Stop ETA task
-        if eta_task:
-            eta_task.cancel()
-            try:
-                await eta_task
-            except asyncio.CancelledError:
+                await tracker.update(current, total, eta=eta, speed=avg_speed)
+            except:
                 pass
-            # Final update
-            if tracker and not cancelled_downloads.get(user_id):
-                try:
-                    await tracker.update(file_size, file_size, eta="0m 0s", speed=speed_mbps*(1024**2) if 'speed_mbps' in locals() else 0)
-                except:
-                    pass
+
+            last_update = now
+            last_bytes = current
+
+    # Simple download_media - most reliable
+    await client.download_media(media, file=str(output_path), progress_callback=progress_callback)
+
+    elapsed = time.time() - start_time
+    speed_mbps = (file_size / (1024**2)) / elapsed if elapsed > 0 else 0
+    logger.info(f"✅ Downloaded {file_size/(1024**2):.1f}MB in {elapsed:.1f}s ({speed_mbps:.1f} MB/s)")
+
+    if tracker:
+        try:
+            await tracker.update(file_size, file_size, eta="Done", speed=speed_mbps * (1024**2))
+        except:
+            pass
+
+    return output_path
 
 
 def format_size(size_bytes: int) -> str:
@@ -665,6 +596,63 @@ async def copy_backup_async(src: Path, dst: Path) -> bool:
     """Non-blocking file copy using executor."""
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(executor, copy_backup_sync, src, dst)
+
+
+async def is_versions_dir_empty() -> bool:
+    """Check if IPA/versions/ directory is empty (non-blocking)."""
+    def _check_empty():
+        if not VERSIONS_PATH.exists():
+            return True
+        try:
+            return not any(VERSIONS_PATH.iterdir())
+        except Exception:
+            return True
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(executor, _check_empty)
+
+
+async def restore_placeholder_ipa() -> bool:
+    """
+    Restore placeholder.ipa to IPA/soundcloud.ipa when versions directory is empty.
+    Returns True if successful, False otherwise.
+    """
+    placeholder_path = PROJECT_PATH / "assets" / "placeholder.ipa"
+    target_path = MAIN_IPA_PATH
+
+    def _restore():
+        if not placeholder_path.exists():
+            logger.error(
+                f"CRITICAL: placeholder.ipa not found at {placeholder_path}. "
+                "Cannot restore safe state after version deletion."
+            )
+            return False
+        try:
+            shutil.copy2(placeholder_path, target_path)
+            logger.info(f"Restored placeholder.ipa to {target_path}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to restore placeholder.ipa: {e}")
+            return False
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(executor, _restore)
+
+
+async def delete_file_async(file_path: Path) -> bool:
+    """Delete a file asynchronously (non-blocking)."""
+    def _delete():
+        try:
+            if file_path.exists():
+                file_path.unlink()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Error deleting file {file_path}: {e}")
+            return False
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(executor, _delete)
 
 
 async def cleanup_old_versions(history: dict) -> None:
@@ -1727,7 +1715,16 @@ async def callback_delete_version(callback: CallbackQuery, state: FSMContext) ->
 
 @router.callback_query(F.data == "confirm_delete_version")
 async def callback_confirm_delete_version(callback: CallbackQuery, state: FSMContext) -> None:
-    """Actually delete the version after confirmation."""
+    """
+    Universal Delete handler: deletes version from ALL locations asynchronously.
+
+    Lifecycle:
+    1. Delete from local disk (IPA/versions/)
+    2. Remove from version_history.json
+    3. Remove from source.json
+    4. Delete GitHub release if exists
+    5. Check empty state and restore placeholder.ipa if needed
+    """
     if not is_owner(callback.from_user.id):
         await callback.answer("Access denied", show_alert=True)
         return
@@ -1738,336 +1735,230 @@ async def callback_confirm_delete_version(callback: CallbackQuery, state: FSMCon
     filename_to_delete = data.get("filename_to_delete")
     is_untracked = data.get("is_untracked", False)
     is_github = data.get("is_github", False)
-    
+
     if not version_to_delete:
         await callback.answer("No version selected", show_alert=True)
         await state.clear()
         return
-    
+
     await callback.answer("Deleting version...")
-    
+
     try:
-        # Handle GitHub releases (in source.json but not tracked locally)
-        if is_github:
-            # Delete GitHub release
-            release_deleted = await delete_github_release(version_to_delete)
-            
-            # Update source.json to remove the version
-            source = await load_source_json()
-            updated_source = False
-            if source.get("apps"):
-                for app in source["apps"]:
-                    if app.get("versions"):
-                        original_count = len(app["versions"])
-                        app["versions"] = [v for v in app["versions"] if v.get("version") != version_to_delete]
-                        if len(app["versions"]) < original_count:
-                            updated_source = True
-                            # Update app-level fields
-                            if app.get("versions") and len(app["versions"]) > 0:
-                                versions_sorted = sorted(app["versions"], key=lambda x: x.get("date", ""), reverse=True)
-                                latest = versions_sorted[0]
-                                app["version"] = latest.get("version", "")
-                                app["versionDate"] = latest.get("date", "")
-                                app["size"] = latest.get("size", 0)
-                                app["downloadURL"] = latest.get("downloadURL", "")
-                            else:
-                                app["version"] = ""
-                                app["versionDate"] = ""
-                                app["size"] = 0
-                                app["downloadURL"] = ""
-            
-            # Push updated source.json to GitHub
-            github_pushed = False
-            placeholder_added = False
-            
-            if updated_source:
-                # Check if repo is now empty and add placeholder if needed
-                if is_repo_empty(source):
-                    source = get_placeholder_source()
-                    placeholder_added = True
-                    logger.info("Repo is now empty, adding placeholder app")
-                
-                await save_source_json(source)
-                if GITHUB_TOKEN:
-                    try:
-                        commit_msg = f"Remove version {version_to_delete}"
-                        if placeholder_added:
-                            commit_msg += " and restore placeholder"
-                        github_pushed = await push_file_to_github(
-                            SOURCE_JSON_PATH,
-                            "repo/esign/source.json",
-                            commit_msg
-                        )
-                    except Exception as e:
-                        logger.error(f"Failed to push source.json to GitHub: {e}")
-            
-            release_status = "✅" if release_deleted else "⚠️ (not found)"
-            source_status = "✅ (pushed to GitHub)" if github_pushed else "⚠️ (local only)" if updated_source else "⚠️"
-            
-            placeholder_text = "\n📦 **Placeholder app restored** (repo was empty)" if placeholder_added else ""
-            
-            await callback.message.edit_text(
-                f"✅ **GitHub Version Deleted**\n\n"
-                f"🗑️ Deleted version: `{version_to_delete}`\n"
-                f"🌐 **GitHub release:** {release_status}\n"
-                f"📄 **Source updated:** {source_status}{placeholder_text}",
-                parse_mode=ParseMode.MARKDOWN,
-            )
-            await state.clear()
-            await callback.answer()
-            return
-        
-        # Handle untracked files differently
+        # Track deletion results for summary
+        results = {
+            "local_file_deleted": False,
+            "history_updated": False,
+            "source_updated": False,
+            "github_release_deleted": False,
+            "github_pushed": False,
+            "placeholder_restored": False,
+            "placeholder_ipa_copied": False,
+            "deleted_filename": None,
+        }
+
+        # =================================================================
+        # STEP 1: Determine the file to delete and delete from local disk
+        # =================================================================
+        file_path = None
+
         if is_untracked and filename_to_delete:
-            # Delete untracked file directly
+            # Untracked file - use provided filename
             if filename_to_delete == "soundcloud.ipa":
-                file_path = ESIGN_PATH / filename_to_delete
+                file_path = MAIN_IPA_PATH
             else:
                 file_path = VERSIONS_PATH / filename_to_delete
-            
-            if file_path.exists():
-                try:
-                    file_path.unlink()
-                    logger.info(f"Deleted untracked file: {filename_to_delete}")
-                    
-                    # Also update source.json to ensure it's clean
-                    # Check if this file might be referenced in source.json by URL
-                    source = await load_source_json()
-                    updated_source = False
-                    
-                    # #region agent log
-                    log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "bot.py:1118", "message": "Checking source.json for untracked file deletion", "data": {"filename": filename_to_delete, "version": version_to_delete}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-                    # #endregion
-                    
-                    if source.get("apps"):
-                        for app in source["apps"]:
-                            # Check if downloadURL points to this file or if version matches
-                            download_url = app.get("downloadURL", "")
-                            app_version = app.get("version", "")
-                            
-                            # Check if this version or file is referenced
-                            if (filename_to_delete in download_url or 
-                                "soundcloud.ipa" in download_url or
-                                version_to_delete in app_version or
-                                version_to_delete in download_url):
-                                # This might be referencing the deleted file
-                                # Remove it from versions array if it matches
-                                if app.get("versions"):
-                                    # Try to find and remove any version that might match
-                                    original_count = len(app["versions"])
-                                    app["versions"] = [
-                                        v for v in app["versions"] 
-                                        if (filename_to_delete not in v.get("downloadURL", "") and
-                                            version_to_delete != v.get("version", ""))
-                                    ]
-                                    if len(app["versions"]) < original_count:
-                                        updated_source = True
-                                        
-                                        # #region agent log
-                                        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "bot.py:1140", "message": "Removed version from source.json", "data": {"removed_count": original_count - len(app["versions"]), "remaining_count": len(app["versions"])}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-                                        # #endregion
-                                        
-                                        # Update app-level fields if needed
-                                        if app.get("versions") and len(app["versions"]) > 0:
-                                            versions_sorted = sorted(app["versions"], key=lambda x: x.get("date", ""), reverse=True)
-                                            latest = versions_sorted[0]
-                                            app["version"] = latest.get("version", "")
-                                            app["versionDate"] = latest.get("date", "")
-                                            app["size"] = latest.get("size", 0)
-                                            app["downloadURL"] = latest.get("downloadURL", "")
-                                        else:
-                                            app["version"] = ""
-                                            app["versionDate"] = ""
-                                            app["size"] = 0
-                                            app["downloadURL"] = ""
-                                elif app_version == version_to_delete or filename_to_delete in download_url:
-                                    # App-level fields reference this file/version
-                                    updated_source = True
-                                    app["version"] = ""
-                                    app["versionDate"] = ""
-                                    app["size"] = 0
-                                    app["downloadURL"] = ""
-                                    
-                                    # #region agent log
-                                    log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "bot.py:1160", "message": "Cleared app-level fields in source.json", "data": {}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-                                    # #endregion
-                    
-                    # Push updated source.json to GitHub if it was modified
-                    github_pushed = False
-                    if updated_source:
-                        # #region agent log
-                        log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "bot.py:1165", "message": "Saving updated source.json", "data": {"updated": True}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-                        # #endregion
-                        await save_source_json(source)
-                        if GITHUB_TOKEN:
-                            try:
-                                github_pushed = await push_file_to_github(
-                                    SOURCE_JSON_PATH,
-                                    "repo/esign/source.json",
-                                    f"Remove untracked file {filename_to_delete} from repository"
-                                )
-                                # #region agent log
-                                log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "bot.py:1175", "message": "GitHub push result for untracked file deletion", "data": {"pushed": github_pushed}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-                                # #endregion
-                                if github_pushed:
-                                    logger.info("Pushed updated source.json to GitHub after untracked file deletion")
-                            except Exception as e:
-                                logger.error(f"Failed to push source.json to GitHub: {e}")
-                                # #region agent log
-                                log_data = {"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "bot.py:1182", "message": "GitHub push exception", "data": {"error": str(e)}, "timestamp": int(datetime.now().timestamp() * 1000)}; f = open(r"c:\Users\schoo\Documents\Esign - FeatherRepo - Telegram bot\.cursor\debug.log", "a", encoding="utf-8"); f.write(json.dumps(log_data) + "\n"); f.close()
-                                # #endregion
-                    
-                    push_status = "✅ (pushed to GitHub)" if github_pushed else "⚠️ (local only)" if updated_source else ""
-                    success_text = (
-                        f"✅ **Untracked File Deleted**\n\n"
-                        f"🗑️ Deleted: `{filename_to_delete}`\n"
-                        f"📱 Version: `{version_to_delete}`"
-                    )
-                    if push_status:
-                        success_text += f"\n\n🔄 **Source updated:** {push_status}"
-                    
-                    await callback.message.edit_text(
-                        success_text,
-                        parse_mode=ParseMode.MARKDOWN,
-                    )
-                    await state.clear()
-                    await callback.answer()
-                    return
-                except Exception as e:
-                    logger.error(f"Error deleting untracked file {filename_to_delete}: {e}")
-                    await callback.message.edit_text(
-                        f"❌ **Error**\n\nFailed to delete file: `{str(e)}`",
-                        parse_mode=ParseMode.MARKDOWN,
-                    )
-                    await state.clear()
-                    await callback.answer()
-                    return
-            else:
-                await callback.message.edit_text(
-                    f"❌ **File not found**\n\nFile `{filename_to_delete}` does not exist.",
-                    parse_mode=ParseMode.MARKDOWN,
-                )
-                await state.clear()
-                await callback.answer()
-                return
-        
-        # Handle tracked versions
-        # Load version history
+            results["deleted_filename"] = filename_to_delete
+        else:
+            # Tracked version - look up filename in version_history.json
+            history = await load_version_history()
+            versions = history.get("versions", [])
+            for v in versions:
+                if v.get("version") == version_to_delete:
+                    fn = v.get("filename", "")
+                    if fn:
+                        file_path = VERSIONS_PATH / fn
+                        results["deleted_filename"] = fn
+                    break
+
+        # Delete local file asynchronously (non-blocking)
+        if file_path:
+            results["local_file_deleted"] = await delete_file_async(file_path)
+            if results["local_file_deleted"]:
+                logger.info(f"Deleted local file: {file_path.name}")
+
+        # =================================================================
+        # STEP 2: Update version_history.json (remove version entry)
+        # =================================================================
         history = await load_version_history()
         versions = history.get("versions", [])
         current_version = history.get("current_version", "")
-        
+
         # Find and remove the version
-        version_found = False
-        deleted_filename = None
-        for i, v in enumerate(versions):
-            if v.get("version") == version_to_delete:
-                version_found = True
-                deleted_filename = v.get("filename", "")
-                
-                # Delete the IPA file if it exists
-                if deleted_filename:
-                    file_path = VERSIONS_PATH / deleted_filename
-                    if file_path.exists():
-                        try:
-                            file_path.unlink()
-                            logger.info(f"Deleted version file: {deleted_filename}")
-                        except Exception as e:
-                            logger.error(f"Error deleting file {deleted_filename}: {e}")
-                
-                # Remove from versions list
-                versions.pop(i)
-                break
-        
-        if not version_found:
-            await callback.message.edit_text(
-                f"❌ **Version not found**\n\nVersion `{version_to_delete}` was not found in the repository.",
-                parse_mode=ParseMode.MARKDOWN,
-            )
-            await state.clear()
-            await callback.answer()
-            return
-        
-        # Update current_version if we deleted the current one
-        if current_version == version_to_delete:
-            if versions:
-                # Set to the most recent version
-                versions_sorted = sorted(versions, key=lambda x: x.get("date", ""), reverse=True)
-                history["current_version"] = versions_sorted[0].get("version", "")
-            else:
-                history["current_version"] = ""
-        
-        # Update history
-        history["versions"] = versions
-        
-        # Save updated history
-        if await save_version_history(history):
-            # Always update source.json to remove deleted version
-            source = await load_source_json()
-            if source.get("apps"):
-                for app in source["apps"]:
-                    # Remove deleted version from versions array
-                    if app.get("versions"):
-                        app["versions"] = [v for v in app.get("versions", []) if v.get("version") != version_to_delete]
-                    
-                    # Update app-level fields if we deleted the current version or if no versions left
-                    if current_version == version_to_delete or not app.get("versions"):
-                        if app.get("versions") and len(app["versions"]) > 0:
-                            # Set to most recent remaining version
-                            versions_sorted = sorted(app["versions"], key=lambda x: x.get("date", ""), reverse=True)
-                            latest = versions_sorted[0]
-                            app["version"] = latest.get("version", "")
-                            app["versionDate"] = latest.get("date", "")
-                            app["size"] = latest.get("size", 0)
-                            app["downloadURL"] = latest.get("downloadURL", "")
-                        else:
-                            # No versions left
-                            app["version"] = ""
-                            app["versionDate"] = ""
-                            app["size"] = 0
-                            app["downloadURL"] = ""
-            
-            await save_source_json(source)
-            
-            # Push updated source.json to GitHub
-            github_pushed = False
-            if GITHUB_TOKEN:
-                try:
-                    github_pushed = await push_file_to_github(
-                        SOURCE_JSON_PATH,
-                        "repo/esign/source.json",
-                        f"Remove version {version_to_delete} from repository"
-                    )
-                    if github_pushed:
-                        logger.info("Pushed updated source.json to GitHub")
-                except Exception as e:
-                    logger.error(f"Failed to push source.json to GitHub: {e}")
-            
-            push_status = "✅ (pushed to GitHub)" if github_pushed else "⚠️ (local only)"
-            await callback.message.edit_text(
-                f"✅ **Version Deleted**\n\n"
-                f"🗑️ Deleted version: `{version_to_delete}`\n"
-                f"📚 Remaining versions: {len(versions)}\n"
-                f"📱 Current version: `{history['current_version'] or 'None'}`\n\n"
-                f"🔄 **Source updated:** {push_status}",
-                parse_mode=ParseMode.MARKDOWN,
-            )
-            logger.info(f"Deleted version: {version_to_delete}")
-        else:
-            await callback.message.edit_text(
-                "❌ **Deletion Failed**\n\nFailed to save updated version history.",
-                parse_mode=ParseMode.MARKDOWN,
-            )
-        
-        await state.clear()
-        await callback.answer()
-        
+        original_count = len(versions)
+        versions = [v for v in versions if v.get("version") != version_to_delete]
+
+        if len(versions) < original_count:
+            # Version was removed
+            # Update current_version if we deleted the current one
+            if current_version == version_to_delete:
+                if versions:
+                    versions_sorted = sorted(versions, key=lambda x: x.get("date", ""), reverse=True)
+                    history["current_version"] = versions_sorted[0].get("version", "")
+                else:
+                    history["current_version"] = ""
+
+            history["versions"] = versions
+            results["history_updated"] = await save_version_history(history)
+            if results["history_updated"]:
+                logger.info(f"Removed {version_to_delete} from version_history.json")
+
+        # =================================================================
+        # STEP 3: Update source.json (remove version from apps)
+        # =================================================================
+        source = await load_source_json()
+        source_modified = False
+
+        if source.get("apps"):
+            for app in source["apps"]:
+                # Remove version from versions array
+                if app.get("versions"):
+                    orig_versions_count = len(app["versions"])
+                    # Match by version string OR by filename in downloadURL
+                    app["versions"] = [
+                        v for v in app["versions"]
+                        if (v.get("version") != version_to_delete and
+                            (not results["deleted_filename"] or
+                             results["deleted_filename"] not in v.get("downloadURL", "")))
+                    ]
+                    if len(app["versions"]) < orig_versions_count:
+                        source_modified = True
+
+                # Check if app-level fields reference deleted version
+                app_version = app.get("version", "")
+                download_url = app.get("downloadURL", "")
+                matches_version = (version_to_delete == app_version or
+                                   version_to_delete in download_url)
+                matches_filename = (results["deleted_filename"] and
+                                    results["deleted_filename"] in download_url)
+
+                if matches_version or matches_filename or source_modified:
+                    # Update app-level fields to latest remaining version
+                    if app.get("versions") and len(app["versions"]) > 0:
+                        versions_sorted = sorted(
+                            app["versions"],
+                            key=lambda x: x.get("date", ""),
+                            reverse=True
+                        )
+                        latest = versions_sorted[0]
+                        app["version"] = latest.get("version", "")
+                        app["versionDate"] = latest.get("date", "")
+                        app["size"] = latest.get("size", 0)
+                        app["downloadURL"] = latest.get("downloadURL", "")
+                    else:
+                        app["version"] = ""
+                        app["versionDate"] = ""
+                        app["size"] = 0
+                        app["downloadURL"] = ""
+                    source_modified = True
+
+        # Check if repo is now empty and restore placeholder source
+        if source_modified and is_repo_empty(source):
+            source = get_placeholder_source()
+            results["placeholder_restored"] = True
+            logger.info("Repo is now empty, restoring placeholder app in source.json")
+
+        if source_modified:
+            results["source_updated"] = await save_source_json(source)
+            if results["source_updated"]:
+                logger.info(f"Updated source.json after deleting {version_to_delete}")
+
+        # =================================================================
+        # STEP 4: Delete GitHub release (non-blocking API call)
+        # =================================================================
+        # Try to delete GitHub release regardless of is_github flag
+        # (ensures cleanup even for edge cases)
+        if GITHUB_TOKEN and GITHUB_OWNER and GITHUB_REPO:
+            results["github_release_deleted"] = await delete_github_release(version_to_delete)
+            if results["github_release_deleted"]:
+                logger.info(f"Deleted GitHub release for v{version_to_delete}")
+
+        # Push updated source.json to GitHub
+        if results["source_updated"] and GITHUB_TOKEN:
+            try:
+                commit_msg = f"Remove version {version_to_delete}"
+                if results["placeholder_restored"]:
+                    commit_msg += " and restore placeholder"
+                results["github_pushed"] = await push_file_to_github(
+                    SOURCE_JSON_PATH,
+                    "repo/esign/source.json",
+                    commit_msg
+                )
+                if results["github_pushed"]:
+                    logger.info("Pushed updated source.json to GitHub")
+            except Exception as e:
+                logger.error(f"Failed to push source.json to GitHub: {e}")
+
+        # =================================================================
+        # STEP 5: Empty State Check - Restore placeholder.ipa if needed
+        # =================================================================
+        if await is_versions_dir_empty():
+            logger.info("IPA/versions/ is empty, restoring placeholder.ipa")
+            results["placeholder_ipa_copied"] = await restore_placeholder_ipa()
+            if not results["placeholder_ipa_copied"]:
+                logger.warning("Failed to restore placeholder.ipa - assets/placeholder.ipa may be missing")
+
+        # =================================================================
+        # BUILD RESULT MESSAGE
+        # =================================================================
+        # Determine primary status icons
+        local_status = "✅" if results["local_file_deleted"] else "⚠️ (not found)"
+        metadata_status = "✅" if (results["history_updated"] or results["source_updated"]) else "⚠️"
+        github_release_status = "✅" if results["github_release_deleted"] else "⏭️ (none)"
+        github_push_status = "✅" if results["github_pushed"] else ("⚠️ (local)" if results["source_updated"] else "⏭️")
+
+        # Build message
+        message_parts = [
+            f"✅ **Version Deleted**\n",
+            f"🗑️ **Version:** `{version_to_delete}`\n",
+        ]
+
+        if results["deleted_filename"]:
+            message_parts.append(f"📄 **File:** `{results['deleted_filename']}`\n")
+
+        message_parts.append(f"\n**Deletion Summary:**\n")
+        message_parts.append(f"• Local disk: {local_status}\n")
+        message_parts.append(f"• Metadata: {metadata_status}\n")
+        message_parts.append(f"• GitHub release: {github_release_status}\n")
+        message_parts.append(f"• GitHub sync: {github_push_status}\n")
+
+        if results["placeholder_restored"]:
+            message_parts.append(f"\n📦 **Placeholder restored** (source.json)\n")
+
+        if results["placeholder_ipa_copied"]:
+            message_parts.append(f"📦 **Placeholder IPA copied** (empty state)\n")
+        elif await is_versions_dir_empty() and not results["placeholder_ipa_copied"]:
+            message_parts.append(f"\n⚠️ **Warning:** Could not restore placeholder.ipa\n")
+
+        # Show remaining versions count
+        remaining_history = await load_version_history()
+        remaining_count = len(remaining_history.get("versions", []))
+        current = remaining_history.get("current_version", "None") or "None"
+        message_parts.append(f"\n📚 **Remaining:** {remaining_count} version(s)\n")
+        message_parts.append(f"📱 **Current:** `{current}`")
+
+        await callback.message.edit_text(
+            "".join(message_parts),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        logger.info(f"Universal delete completed for version: {version_to_delete}")
+
     except Exception as e:
-        logger.error(f"Error deleting version: {e}")
+        logger.error(f"Error in universal delete for version {version_to_delete}: {e}")
         await callback.message.edit_text(
             f"❌ **Error**\n\nFailed to delete version: `{str(e)}`",
             parse_mode=ParseMode.MARKDOWN,
         )
+    finally:
         await state.clear()
         await callback.answer()
 
@@ -2125,42 +2016,27 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                 saved_msg = await telethon_client.get_messages('me', ids=saved_msg_id)
                 
                 if saved_msg and saved_msg.media:
-                    # Define progress callback with cancellation check
-                    # Use parallel download for maximum speed
+                    # Use simple fast_download - reliable single stream
                     try:
-                        logger.info(f"Downloading {upload['filename']} using parallel mode (4 connections)")
-                        await parallel_download(
+                        logger.info(f"Downloading {upload['filename']} via Telethon")
+                        await fast_download(
                             telethon_client,
                             saved_msg.media,
                             str(MAIN_IPA_PATH),
                             user_id,
-                            tracker=tracker,
-                            num_connections=4
+                            tracker=tracker
                         )
                     except FloodWaitError as e:
-                        logger.warning(f"FloodWaitError: {e}. Retrying with 3 connections...")
+                        logger.warning(f"FloodWaitError: waiting {e.seconds}s...")
                         await asyncio.sleep(e.seconds)
-                        await parallel_download(
+                        await fast_download(
                             telethon_client,
                             saved_msg.media,
                             str(MAIN_IPA_PATH),
                             user_id,
-                            tracker=tracker,
-                            num_connections=3
+                            tracker=tracker
                         )
-                    except Exception as e:
-                        logger.error(f"Parallel failed: {e}. Fallback to sequential (slower).")
-                        # Fallback to pure sequential
-                        async with aiofiles.open(MAIN_IPA_PATH, "wb") as f:
-                            downloaded = 0
-                            total_size = upload["size"]
-                            async for chunk in telethon_client.iter_download(saved_msg):
-                                if cancelled_downloads.get(user_id):
-                                    raise Exception("Download cancelled by user")
-                                await f.write(chunk)
-                                downloaded += len(chunk)
-                                asyncio.create_task(tracker.update(downloaded, total_size))
-                    logger.info("✅ Downloaded via Telethon from Saved Messages (fast)")
+                    logger.info("✅ Downloaded via Telethon")
                     download_success = True
                 else:
                     logger.warning("Could not get media from Saved Messages")

@@ -3,3 +3,4 @@ aiofiles>=23.0
 aiohttp>=3.9.0
 python-dotenv
 telethon>=1.33.0
+cryptg>=0.4.0
