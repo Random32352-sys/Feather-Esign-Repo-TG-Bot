@@ -561,10 +561,14 @@
         <p class="footer">Open on iOS to add this source</p>
     </div>
 
-    <!-- Hamburger Menu Button -->
+    <!-- Help Button -->
     <div class="menu-btn" id="menuBtn">
-        <div class="menu-bar"></div>
-        <div class="menu-bar"></div>
+        <svg class="help-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
     </div>
 
     <!-- FAQ Overlay -->
@@ -606,41 +610,41 @@
     </div>
 
     <style>
-        /* Hamburger Button */
+        /* Help Button */
         .menu-btn {
             position: fixed;
-            top: 30px;
-            right: 30px;
-            width: 40px;
-            height: 40px;
+            top: 24px;
+            right: 24px;
+            width: 44px;
+            height: 44px;
             cursor: pointer;
             z-index: 300;
             display: flex;
-            flex-direction: column;
+            align-items: center;
             justify-content: center;
-            align-items: flex-end;
-            gap: 6px;
-            transition: opacity 0.5s ease;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
-        .menu-btn:hover .menu-bar {
-            background-color: #fff;
+        .menu-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: scale(1.08);
+            box-shadow: 0 6px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 255, 255, 0.1);
         }
 
-        .menu-bar {
-            width: 24px;
-            height: 2px;
-            background-color: rgba(255, 255, 255, 0.7);
-            border-radius: 2px;
+        .help-icon {
+            color: rgba(255, 255, 255, 0.6);
             transition: all 0.3s ease;
         }
 
-        .menu-bar:nth-child(2) {
-            width: 16px;
-        }
-
-        .menu-btn:hover .menu-bar:nth-child(2) {
-            width: 24px;
+        .menu-btn:hover .help-icon {
+            color: #fff;
         }
 
         /* FAQ Overlay */
