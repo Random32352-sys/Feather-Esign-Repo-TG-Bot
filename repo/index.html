@@ -561,7 +561,236 @@
         <p class="footer">Open on iOS to add this source</p>
     </div>
 
+    <!-- Hamburger Menu Button -->
+    <div class="menu-btn" id="menuBtn">
+        <div class="menu-bar"></div>
+        <div class="menu-bar"></div>
+    </div>
+
+    <!-- FAQ Overlay -->
+    <div class="faq-overlay" id="faqOverlay">
+        <div class="faq-content">
+            <button class="close-btn" id="closeBtn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <h2>Help & FAQ</h2>
+
+            <div class="faq-item">
+                <h3>Feather Install Failed?</h3>
+                <p>If installation fails silently, switch to <strong>"Semi-Local"</strong> in <strong>Settings >
+                        Installation > Server Type</strong>.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Why "Fully Local" fails?</h3>
+                <p>Fully Local mode requires whitelisting <code>*.backloop.dev</code> in your DNS. (Ad-blockers like
+                    NextDNS often block this loopback domain).</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>App Crashing / Not Installing?</h3>
+                <p>Try these recommended fixes:</p>
+                <ul
+                    style="margin-top: 8px; margin-left: 20px; color: rgba(255,255,255,0.7); font-size: 13px; line-height: 1.6;">
+                    <li>Use a <strong>paid</strong> certificate.</li>
+                    <li>Do <strong>NOT</strong> change the Bundle ID.</li>
+                    <li>If crashing on iOS 26: Use Feather and replace Substrate with <strong>ElleKit</strong>.</li>
+                </ul>
+            </div>
+
+
+        </div>
+    </div>
+
+    <style>
+        /* Hamburger Button */
+        .menu-btn {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            z-index: 300;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 6px;
+            transition: opacity 0.5s ease;
+        }
+
+        .menu-btn:hover .menu-bar {
+            background-color: #fff;
+        }
+
+        .menu-bar {
+            width: 24px;
+            height: 2px;
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .menu-bar:nth-child(2) {
+            width: 16px;
+        }
+
+        .menu-btn:hover .menu-bar:nth-child(2) {
+            width: 24px;
+        }
+
+        /* FAQ Overlay */
+        .faq-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 400;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .faq-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .faq-content {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            width: 100%;
+            max-width: 480px;
+            position: relative;
+            transform: scale(0.95) translateY(10px);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            color: #fff;
+        }
+
+        .faq-overlay.visible .faq-content {
+            transform: scale(1) translateY(0);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .faq-content h2 {
+            font-size: 24px;
+            margin-bottom: 30px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .faq-item {
+            margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .faq-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .faq-item h3 {
+            font-size: 14px;
+            color: #fff;
+            margin-bottom: 8px;
+            opacity: 0.9;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .faq-item p {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.6;
+        }
+
+        .faq-item code {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #ff9900;
+        }
+
+        .faq-item strong {
+            color: #fff;
+        }
+    </style>
+
     <script>
+        // Menu Interactions
+        const menuBtn = document.getElementById('menuBtn');
+        const closeBtn = document.getElementById('closeBtn');
+        const faqOverlay = document.getElementById('faqOverlay');
+
+        function toggleMenu() {
+            const isVisible = faqOverlay.classList.contains('visible');
+            if (isVisible) {
+                faqOverlay.classList.remove('visible');
+                menuBtn.style.opacity = '1';
+                menuBtn.style.pointerEvents = 'auto';
+            } else {
+                faqOverlay.classList.add('visible');
+                menuBtn.style.opacity = '0';
+                menuBtn.style.pointerEvents = 'none';
+            }
+        }
+
+        menuBtn.addEventListener('click', toggleMenu);
+        closeBtn.addEventListener('click', toggleMenu);
+
+        // Close on outside click
+        faqOverlay.addEventListener('click', (e) => {
+            if (e.target === faqOverlay) {
+                toggleMenu();
+            }
+        });
+
+        // Escape key to close
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && faqOverlay.classList.contains('visible')) {
+                toggleMenu();
+            }
+        });
+
         // 3D logo mouse tracking on start screen
         const startLogo = document.getElementById('startLogo');
         document.addEventListener('mousemove', (e) => {
