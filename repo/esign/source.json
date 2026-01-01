@@ -16,9 +16,16 @@
       "versions": [
         {
           "version": "8.42.3",
-          "date": "2026-01-01T17:23:35Z",
+          "date": "2026-01-01T17:23:25",
           "size": 103441891,
-          "downloadURL": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot/releases/download/v8.42.3/soundcloud.ipa?t=1767284615",
+          "downloadURL": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot/releases/download/v8.42.3/soundcloud.ipa",
+          "localizedDescription": "Updated to the latest version"
+        },
+        {
+          "version": "8.42.2",
+          "date": "2026-01-01T17:11:31",
+          "size": 103441291,
+          "downloadURL": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot/releases/download/v8.42.2/soundcloud.ipa",
           "localizedDescription": "Updated to the latest version"
         }
       ],
