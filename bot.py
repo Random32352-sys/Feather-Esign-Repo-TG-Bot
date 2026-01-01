@@ -2287,7 +2287,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
         new_app = {
             "name": f"SoundCloud v{version}",
             "bundleIdentifier": "com.soundcloud.TouchApp",
-            "developerName": "woomc",
+            "developerName": "woomc (@woomc)",
             "iconURL": f"{REPO_URL}/esign/app_icon.png?t={int(datetime.now().timestamp())}",
             "localizedDescription": f"SoundCloud NoAds - updated to the latest version {version}",
             "subtitle": "Tweaked SoundCloud",

@@ -567,7 +567,18 @@
             <a href="#" class="btn btn-secondary" id="feather-btn">Add to Feather</a>
         </div>
 
-        <p class="footer">Open on iOS to add this source</p>
+        <div class="footer">
+            <p style="margin-bottom: 4px;">Tap a button above to install</p>
+            <a href="https://t.me/woomc" class="maintainer-link" target="_blank">
+                <span>Maintained by</span>
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+                <strong>woomc</strong>
+            </a>
+        </div>
     </div>
 
     <!-- Help Button -->
@@ -765,6 +776,44 @@
 
         .faq-item strong {
             color: #fff;
+        }
+
+        .maintainer-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 12px;
+            opacity: 0.5;
+            font-size: 11px;
+            color: #fff;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 6px 12px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .maintainer-link:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .maintainer-link svg {
+            opacity: 0.8;
+        }
+
+        .footer {
+            margin-top: 60px;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
         }
     </style>
 
