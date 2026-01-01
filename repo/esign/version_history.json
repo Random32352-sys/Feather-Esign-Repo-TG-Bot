@@ -5,7 +5,7 @@
   "versions": [
     {
       "version": "8.42.2",
-      "date": "2026-01-01T17:11:31",
+      "date": "2026-01-01T17:11:31Z",
       "size": 103441291,
       "filename": "soundcloud_8.42.2.ipa",
       "changelog": "Updated to the latest version",
@@ -13,7 +13,7 @@
     },
     {
       "version": "8.42.3",
-      "date": "2026-01-01T17:23:25",
+      "date": "2026-01-01T17:23:25Z",
       "size": 103441891,
       "filename": "soundcloud_8.42.3.ipa",
       "changelog": "Updated to the latest version",

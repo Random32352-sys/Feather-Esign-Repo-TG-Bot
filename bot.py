@@ -2196,7 +2196,7 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
         # Load current data
         changelog = await load_changelog()
         history = await load_version_history()
-        now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        now = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
 
         # Upload to GitHub Releases
         await bot.edit_message_text(
