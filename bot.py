@@ -352,9 +352,44 @@ async def save_source_json(source: dict) -> bool:
         return False
 
 
+async def save_clean_source_json(source: dict) -> bool:
+    """Save source.json WITHOUT cache-busting timestamps (for Feather testing)."""
+    try:
+        # Create deep copy to avoid modifying original
+        clean_source = json.loads(json.dumps(source))
+        
+        # Remove timestamps
+        def _clean_url(url: str) -> str:
+            if not url or "?t=" not in url:
+                return url
+            return url.split("?t=")[0]
+
+        if clean_source.get("apps"):
+            for app in clean_source["apps"]:
+                if app.get("downloadURL"):
+                    app["downloadURL"] = _clean_url(app["downloadURL"])
+                if app.get("iconURL"):
+                    app["iconURL"] = _clean_url(app["iconURL"])
+                if app.get("versions"):
+                    for version in app["versions"]:
+                        if version.get("downloadURL"):
+                            version["downloadURL"] = _clean_url(version["downloadURL"])
+
+        tmp_path = SOURCE_JSON_PATH.with_suffix(".tmp")
+        async with aiofiles.open(tmp_path, "w", encoding="utf-8") as f:
+            await f.write(json.dumps(clean_source, indent=2))
+        tmp_path.replace(SOURCE_JSON_PATH)
+        return True
+    except Exception as e:
+        logger.error(f"Error saving clean source.json: {e}")
+        return False
+
+
 def get_placeholder_source() -> dict:
     """Get the placeholder source.json structure for when repo is empty."""
     now_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Use placeholder.ipa as the download URL (will get cache-bust timestamp in save_source_json)
+    placeholder_ipa_url = f"{REPO_URL}/esign/placeholder.ipa"
     return {
         "name": "woomc repo",
         "identifier": "xyz.woomc.repo",
@@ -375,7 +410,7 @@ def get_placeholder_source() -> dict:
                         "version": "1.0",
                         "date": now_iso,
                         "size": 0,
-                        "downloadURL": f"{REPO_URL}/esign/source.json"
+                        "downloadURL": placeholder_ipa_url
                     }
                 ],
                 # "appPermissions": {},
@@ -383,7 +418,7 @@ def get_placeholder_source() -> dict:
                 "version": "1.0",
                 "versionDate": now_iso,
                 "size": 0,
-                "downloadURL": f"{REPO_URL}/esign/source.json"
+                "downloadURL": placeholder_ipa_url
             }
         ],
         "news": []
@@ -1235,6 +1270,40 @@ async def cmd_syncgithub(message: Message) -> None:
         await message.answer(f"❌ **Error:** `{str(e)}`", parse_mode=ParseMode.MARKDOWN)
 
 
+@router.message(Command("testfeather"))
+async def cmd_testfeather(message: Message) -> None:
+    """Force push a CLEAN source.json (no timestamps) for Feather testing."""
+    if not is_owner(message.from_user.id):
+        return
+
+    await message.answer("🧪 **Preparing Feather Test...**\nRunning: Clean JSON + Force Push", parse_mode=ParseMode.MARKDOWN)
+    
+    try:
+        source = await load_source_json()
+        saved = await save_clean_source_json(source)
+        
+        if not saved:
+            await message.answer("❌ Failed to save clean JSON locally.")
+            return
+
+        success = await push_file_to_github(
+            SOURCE_JSON_PATH,
+            "repo/esign/source.json",
+            "Feather Test: Removed timestamps"
+        )
+        
+        if success:
+            await message.answer(
+                "✅ **Clean source.json pushed!**\n\n"
+                "Timestamps have been removed from URLs.\n"
+                "Please wait 30s for GitHub Pages to deploy, then try adding to Feather again.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        else:
+            await message.answer("❌ Failed to push to GitHub.")
+            
+    except Exception as e:
+        await message.answer(f"❌ **Error:** `{str(e)}`", parse_mode=ParseMode.MARKDOWN)
 
 
 
@@ -2219,12 +2288,13 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
                     "tintColor": "#FF5500",
                     "versions": [
                         {
-                            "version": version,
-                            "date": now_iso,
-                            "size": actual_size,
-                            "downloadURL": download_url,
-                            "localizedDescription": changelog,
+                            "version": v["version"],
+                            "date": v["date"],
+                            "size": v["size"],
+                            "downloadURL": v["download_url"],
+                            "localizedDescription": v.get("changelog", "Updated to the latest version"),
                         }
+                        for v in reversed(history["versions"])
                     ],
                     # "appPermissions": {}, # Removed for Feather compatibility
                     "screenshotURLs": [],
@@ -2363,7 +2433,9 @@ async def main() -> None:
         BotCommand(command="setchangelog", description="Set changelog text"),
         BotCommand(command="setdescription", description="Set app description"),
         BotCommand(command="deleteversion", description="Delete a version"),
+        BotCommand(command="deleteversion", description="Delete a version"),
         BotCommand(command="syncgithub", description="Force push source.json to GitHub"),
+        BotCommand(command="testfeather", description="Test Feather fix (remove timestamps)"),
     ]
     await bot.set_my_commands(commands)
 
