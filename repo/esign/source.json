@@ -6,26 +6,27 @@
   "sourceURL": "https://woomc.xyz/repo/esign/source.json",
   "apps": [
     {
-      "name": "Coming Soon",
-      "bundleIdentifier": "com.placeholder.app",
+      "name": "SoundCloud",
+      "bundleIdentifier": "com.soundcloud.TouchApp",
       "developerName": "woomc",
-      "iconURL": "https://woomc.xyz/repo/esign/app_icon.png?t=1767283482",
-      "localizedDescription": "More apps will be added here soon!",
-      "subtitle": "Stay tuned",
-      "tintColor": "#808080",
+      "iconURL": "https://woomc.xyz/repo/esign/app_icon.png?t=1767283902",
+      "localizedDescription": "Updated to the latest version 8.42.2",
+      "subtitle": "Tweaked SoundCloud",
+      "tintColor": "#FF5500",
       "versions": [
         {
-          "version": "1.0",
-          "date": "2026-01-01T17:04:42Z",
-          "size": 0,
-          "downloadURL": "https://woomc.xyz/repo/esign/placeholder.ipa?t=1767283482"
+          "version": "8.42.2",
+          "date": "2026-01-01T17:11:42Z",
+          "size": 103441291,
+          "downloadURL": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot/releases/download/v8.42.2/soundcloud.ipa?t=1767283902",
+          "localizedDescription": "Updated to the latest version"
         }
       ],
       "screenshotURLs": [],
-      "version": "1.0",
-      "versionDate": "2026-01-01T17:04:42Z",
-      "size": 0,
-      "downloadURL": "https://woomc.xyz/repo/esign/placeholder.ipa?t=1767283482"
+      "version": "8.42.2",
+      "versionDate": "2026-01-01T17:11:42Z",
+      "size": 103441291,
+      "downloadURL": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot/releases/download/v8.42.2/soundcloud.ipa?t=1767283902"
     }
   ],
   "news": []
