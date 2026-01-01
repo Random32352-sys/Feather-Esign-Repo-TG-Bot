@@ -73,7 +73,7 @@ CHANGELOG_PATH = ESIGN_PATH / "changelog.txt"
 SESSION_NAME = "esignbot_session"
 
 # Max versions to keep
-MAX_VERSIONS = 20
+MAX_VERSIONS = 10
 
 # Executor for non-blocking file operations
 executor = ThreadPoolExecutor(max_workers=2)
@@ -2271,42 +2271,57 @@ async def callback_confirm(callback: CallbackQuery, state: FSMContext, telethon_
             # No description set, use default template with version
             existing_description = f"Updated to the latest version {version}"
         
-        source = {
-            "name": "woomc repo",
-            "identifier": "xyz.woomc.repo",
-            "iconURL": f"{REPO_URL}/esign/repo_icon.png",
-            "website": REPO_URL,
-            "sourceURL": f"{REPO_URL}/esign/source.json",
-            "apps": [
-                {
-                    "name": "SoundCloud",
-                    "bundleIdentifier": "com.soundcloud.TouchApp",
-                    "developerName": "woomc",
-                    "iconURL": f"{REPO_URL}/esign/app_icon.png",
-                    "localizedDescription": existing_description,
-                    "subtitle": "Tweaked SoundCloud",
-                    "tintColor": "#FF5500",
-                    "versions": [
-                        {
-                            "version": v["version"],
-                            "date": v["date"],
-                            "size": v["size"],
-                            "downloadURL": v["download_url"],
-                            "localizedDescription": v.get("changelog", "Updated to the latest version"),
-                        }
-                        for v in reversed(history["versions"])
-                    ],
-                    # "appPermissions": {}, # Removed for Feather compatibility
-                    "screenshotURLs": [],
-                    # Duplicate fields required by Feather
-                    "version": version,
-                    "versionDate": now_iso,
-                    "size": actual_size,
-                    "downloadURL": download_url,
-                }
-            ],
-            "news": [],
+        source = existing_source
+        if not source.get("apps"):
+            source = {
+                "name": "woomc repo",
+                "identifier": "xyz.woomc.repo",
+                "iconURL": f"{REPO_URL}/esign/repo_icon.png",
+                "website": REPO_URL,
+                "sourceURL": f"{REPO_URL}/esign/source.json",
+                "apps": [],
+                "news": []
+            }
+
+        # Create new app entry for this specific version
+        new_app = {
+            "name": f"SoundCloud v{version}",
+            "bundleIdentifier": "com.soundcloud.TouchApp",
+            "developerName": "woomc",
+            "iconURL": f"{REPO_URL}/esign/app_icon.png?t={int(datetime.now().timestamp())}",
+            "localizedDescription": changelog,
+            "subtitle": "Tweaked SoundCloud",
+            "tintColor": "#FF5500",
+            # No versions list - each entry is its own version
+            "versions": [],
+            "screenshotURLs": [],
+            "version": version,
+            "versionDate": now_iso,
+            "size": actual_size,
+            "downloadURL": download_url,
         }
+
+        # Insert new version at the top of the list
+        source.setdefault("apps", []).insert(0, new_app)
+
+        # Clean up old versions for this specific app (bundle ID)
+        # Keep only the newest MAX_VERSIONS entries
+        
+        # 1. Identify SoundCloud apps (newest are at top)
+        all_soundcloud = [app for app in source["apps"] if app.get("bundleIdentifier") == "com.soundcloud.TouchApp"]
+        
+        # 2. Identify other apps
+        other_apps = [app for app in source["apps"] if app.get("bundleIdentifier") != "com.soundcloud.TouchApp"]
+        
+        # 3. Trim SoundCloud list
+        if len(all_soundcloud) > MAX_VERSIONS:
+             kept_soundcloud = all_soundcloud[:MAX_VERSIONS]
+        else:
+             kept_soundcloud = all_soundcloud
+             
+        # 4. Reconstruct list (SoundCloud first, then others)
+        source["apps"] = kept_soundcloud + other_apps
+        
         await save_source_json(source)
 
         # Push source.json to GitHub
