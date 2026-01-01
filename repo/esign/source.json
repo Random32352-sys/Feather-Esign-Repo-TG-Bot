@@ -6,26 +6,19 @@
   "sourceURL": "https://woomc.xyz/repo/esign/source.json",
   "apps": [
     {
-      "name": "Coming Soon",
-      "bundleIdentifier": "com.placeholder.app",
-      "developerName": "woomc",
-      "iconURL": "https://woomc.xyz/repo/esign/app_icon.png?t=1767298714",
-      "localizedDescription": "More apps will be added here soon!",
-      "subtitle": "Stay tuned",
-      "tintColor": "#808080",
-      "versions": [
-        {
-          "version": "1.0",
-          "date": "2026-01-01T20:18:34Z",
-          "size": 0,
-          "downloadURL": "https://woomc.xyz/repo/esign/placeholder.ipa?t=1767298714"
-        }
-      ],
+      "name": "SoundCloud v8.42.3",
+      "bundleIdentifier": "com.soundcloud.TouchApp",
+      "developerName": "@woomc on Telegram",
+      "iconURL": "https://woomc.xyz/repo/esign/app_icon.png?t=1767298882",
+      "localizedDescription": "SoundCloud NoAds - updated to the latest version 8.42.3",
+      "subtitle": "Tweaked SoundCloud",
+      "tintColor": "#FF5500",
+      "versions": [],
       "screenshotURLs": [],
-      "version": "1.0",
-      "versionDate": "2026-01-01T20:18:34Z",
-      "size": 0,
-      "downloadURL": "https://woomc.xyz/repo/esign/placeholder.ipa?t=1767298714"
+      "version": "8.42.3",
+      "versionDate": "2026-01-01T20:21:22Z",
+      "size": 103441891,
+      "downloadURL": "https://github.com/Random32352-sys/Feather-Esign-Repo-TG-Bot/releases/download/v8.42.3/soundcloud.ipa?t=1767298882"
     }
   ],
   "news": []
