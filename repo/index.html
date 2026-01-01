@@ -818,6 +818,43 @@
     </style>
 
     <script>
+        // Initialize
+        const startBtn = document.getElementById('startBtn');
+        const startScreen = document.getElementById('startScreen');
+        const mainContent = document.getElementById('mainContent');
+        const glow1 = document.getElementById('glow1');
+        const glow2 = document.getElementById('glow2');
+        const soundwave = document.getElementById('soundwave');
+        const startLogo = document.getElementById('startLogo');
+        const loader = document.getElementById('loader');
+
+        // Start Button Click
+        startBtn.addEventListener('click', () => {
+            // Haptic feedack pattern if available (mobile)
+            if (window.navigator && window.navigator.vibrate) {
+                window.navigator.vibrate([20]);
+            }
+
+            startScreen.classList.add('hidden');
+
+            // Delayed reveal of main content
+            setTimeout(() => {
+                mainContent.classList.add('visible');
+                glow1.classList.add('visible');
+                glow2.classList.add('visible');
+                soundwave.classList.add('visible');
+            }, 300);
+        });
+
+        // 3D Tilt Effect on Start Screen
+        document.addEventListener('mousemove', (e) => {
+            if (!startScreen.classList.contains('hidden')) {
+                const x = (window.innerWidth / 2 - e.pageX) / 20;
+                const y = (window.innerHeight / 2 - e.pageY) / 20;
+                startLogo.style.transform = `rotateY(${x}deg) rotateX(${y}deg)`;
+            }
+        });
+
         // Menu Interactions
         const menuBtn = document.getElementById('menuBtn');
         const closeBtn = document.getElementById('closeBtn');
@@ -853,31 +890,11 @@
             }
         });
 
-        // 3D logo mouse tracking on start screen
-        const startLogo = document.getElementById('startLogo');
-        document.addEventListener('mousemove', (e) => {
-            if (!document.getElementById('startScreen').classList.contains('hidden')) {
-                const x = (window.innerWidth / 2 - e.pageX) / 20;
-                const y = (window.innerHeight / 2 - e.pageY) / 20;
-                startLogo.style.transform = `rotateY(${x}deg) rotateX(${y}deg)`;
-            }
-        });
-
         // Loading simulation
         window.addEventListener('load', () => {
             setTimeout(() => {
-                document.getElementById('loader').classList.add('hidden');
+                loader.classList.add('hidden');
             }, 1200);
-        });
-
-        // Start button
-        document.getElementById('startBtn').addEventListener('click', () => {
-            document.getElementById('startScreen').classList.add('hidden');
-
-            setTimeout(() => {
-                document.getElementById('mainContent').classList.add('visible');
-                // Keep minimal - no soundwave or glows
-            }, 400);
         });
 
         // 3D logo in main content
